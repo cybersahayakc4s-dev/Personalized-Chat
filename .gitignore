@@ -1,0 +1,78 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+.last_deployed_sha
+
+# Local Persistent Data & Backups (Protected from Git Operations)
+backups/
+data/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# SQLite Databases & WAL/SHM files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+personalize_chat.db*
+test_temp.db*
+
+# Uploads & User Generated Content
+uploads/
+server/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+
+# Node / Frontend
+node_modules/
+client/node_modules/
+client/dist/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vite/
+
+# Operating System & IDE
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.playwright-mcp/

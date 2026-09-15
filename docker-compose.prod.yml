@@ -1,0 +1,113 @@
+name: personalize_chat
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: personalize_chat_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-personalize_chat_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-personalize_chat_prod}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-personalize_chat_app} -d ${POSTGRES_DB:-personalize_chat_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - personalize_chat_network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: personalize_chat_server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-personalize_chat_app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-personalize_chat_prod}
+      SECRET_KEY: ${SECRET_KEY}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@company.internal}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-Main Admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      DEFAULT_MAX_FILE_SIZE_MB: ${DEFAULT_MAX_FILE_SIZE_MB:-500}
+      DEFAULT_LEADER_CEILING_MB: ${DEFAULT_LEADER_CEILING_MB:-2048}
+    volumes:
+      - uploads_data:/app/uploads
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - personalize_chat_network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: personalize_chat_client
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      # Bound strictly to loopback interface to route through host company-nginx
+      - "127.0.0.1:${APP_PORT:-8085}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - personalize_chat_network
+
+volumes:
+  pgdata:
+    name: personalize_chat_pgdata
+  uploads_data:
+    name: personalize_chat_uploads
+
+networks:
+  personalize_chat_network:
+    name: personalize_chat_network
+    internal: false

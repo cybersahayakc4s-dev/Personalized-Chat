@@ -1,0 +1,197 @@
+name: Production CI/CD Deployment - Personalize Chat
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: CI Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install backend dependencies
+        run: |
+          cd server
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Run Backend Test Suite (41 Tests)
+        env:
+          SECRET_KEY: "ci_pipeline_test_secret_key_at_least_32_characters_long"
+          ENVIRONMENT: "testing"
+        run: |
+          python -m pytest server/tests/test_api.py -v
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd client
+          npm ci
+
+      - name: Typecheck and Build Frontend
+        run: |
+          cd client
+          npm run build
+
+      - name: CI Migration Safety Pre-Check (Push Range)
+        run: |
+          echo "Scanning push range for destructive SQL migration statements..."
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE_SHA="HEAD~1"
+          fi
+          CHANGED_MIGRATIONS=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" -- server/alembic/versions/ || true)
+          if [ -n "$CHANGED_MIGRATIONS" ]; then
+            echo "Inspecting migration files: $CHANGED_MIGRATIONS"
+            for file in $CHANGED_MIGRATIONS; do
+              if [ -f "$file" ]; then
+                if grep -iE '\b(drop_table|drop_column|truncate)\b|op\.execute\(.*(DROP|DELETE|TRUNCATE)' "$file"; then
+                  echo "::error::CRITICAL: Destructive migration statement detected in $file! Automatic pipeline aborted. Requires senior manual review and explicit approval."
+                  exit 1
+                fi
+              fi
+            done
+            echo "CI Migration safety check passed: No destructive operations found."
+          else
+            echo "No migration files modified in this push."
+          fi
+
+  deploy:
+    name: Deploy to Cyber Sahayak VPS
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Execute Safe Production Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          envs: TARGET_SHA
+          script_stop: true
+          script: |
+            set -euo pipefail
+            APP_DIR="/opt/company/apps/personalize-chat"
+            echo "=== [1/7] Navigating to application directory & loading environment ==="
+            cd "$APP_DIR"
+
+            if [ -f .env ]; then
+              set -a
+              # Source .env into current bash environment to guarantee variables like
+              # POSTGRES_USER, POSTGRES_DB, and APP_PORT are exported and available to this script
+              . ./.env
+              set +a
+            else
+              echo "::error::CRITICAL: .env file missing in $APP_DIR! Deployment aborted."
+              exit 1
+            fi
+
+            echo "=== [2/7] Recording previous deployment state & inspecting migrations against deployed SHA ==="
+            PREVIOUS_SHA=$(cat .last_deployed_sha 2>/dev/null || git rev-parse HEAD || echo "")
+            echo "$PREVIOUS_SHA" > .last_deployed_sha
+            echo "Current deployed SHA: $PREVIOUS_SHA"
+            echo "Target deployment SHA: $TARGET_SHA"
+
+            git fetch origin main
+
+            # VPS Migration Safety Gate: Diff against the REAL currently running commit SHA
+            if [ -n "$PREVIOUS_SHA" ] && [ "$PREVIOUS_SHA" != "$TARGET_SHA" ]; then
+              echo "Scanning migrations introduced between deployed SHA ($PREVIOUS_SHA) and target SHA ($TARGET_SHA)..."
+              MIGRATION_DIFF=$(git diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA" -- server/alembic/versions/ || true)
+              if [ -n "$MIGRATION_DIFF" ]; then
+                echo "Migrations to evaluate: $MIGRATION_DIFF"
+                for file in $MIGRATION_DIFF; do
+                  if git show "$TARGET_SHA:$file" | grep -iE '\b(drop_table|drop_column|truncate)\b|op\.execute\(.*(DROP|DELETE|TRUNCATE)'; then
+                    echo "::error::CRITICAL: Destructive migration statement detected in $file! Automatic pipeline aborted. Senior manual review and explicit approval required."
+                    exit 1
+                  fi
+                done
+                echo "VPS migration safety check passed: No destructive operations detected."
+              fi
+            fi
+
+            echo "=== [3/7] Creating pre-deployment database backup ==="
+            mkdir -p backups
+            BACKUP_FILE="backups/personalize_chat_backup_$(date +%Y%m%d_%H%M%S).sql"
+            if docker compose ps --services --filter "status=running" | grep -q "^db$"; then
+              echo "Dumping PostgreSQL database to $BACKUP_FILE..."
+              docker compose exec -T db pg_dump -U "${POSTGRES_USER:-personalize_chat_app}" "${POSTGRES_DB:-personalize_chat_prod}" > "$BACKUP_FILE" || {
+                echo "WARNING: Database backup failed or database container empty. Proceeding cautiously."
+              }
+            fi
+
+            echo "=== [4/7] Checking out exact target SHA: $TARGET_SHA ==="
+            git checkout "$TARGET_SHA"
+
+            echo "=== [5/7] Building new images and running database migrations BEFORE service restart ==="
+            # 1. Build new container images without restarting live containers yet
+            docker compose build server client
+
+            # 2. Ensure database container is running and healthy
+            docker compose up -d db
+
+            # 3. Execute Alembic migrations using a one-off container with the NEW server image.
+            # If migrations fail, the script exits immediately and running production services are NOT touched!
+            echo "Applying Alembic migrations against newly built image..."
+            docker compose run --rm server alembic upgrade head
+
+            echo "=== [6/7] Starting application containers with updated code and schema ==="
+            # Scoped strictly to Personalize Chat services to minimize interruption without affecting sibling apps
+            docker compose up -d server client
+
+            echo "=== [7/7] Verifying application health check ==="
+            HEALTH_URL="http://127.0.0.1:${APP_PORT:-8085}/health"
+            HEALTHY=false
+            for i in $(seq 1 12); do
+              echo "Health check probe $i/12 at $HEALTH_URL..."
+              HTTP_STATUS=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$HEALTH_URL" || true)
+              if [ "$HTTP_STATUS" = "200" ]; then
+                echo "Health check PASS (HTTP 200)!"
+                cat /tmp/health_response.json
+                HEALTHY=true
+                break
+              fi
+              echo "Service responded with HTTP $HTTP_STATUS. Waiting 5s..."
+              sleep 5
+            done
+
+            if [ "$HEALTHY" != "true" ]; then
+              echo "::error::CRITICAL: Health check failed after deployment! Initiating automatic code rollback..."
+              if [ -n "$PREVIOUS_SHA" ]; then
+                echo "Rolling back code to previous SHA: $PREVIOUS_SHA"
+                git checkout "$PREVIOUS_SHA"
+                docker compose up -d --build server client
+                echo "Rollback containers deployed. Checking rollback health..."
+                sleep 5
+                curl -f "$HEALTH_URL" || echo "Rollback health check alert: manual inspection required!"
+              fi
+              exit 1
+            fi
+
+            echo "=== DEPLOYMENT SUCCESSFUL: Personalize Chat is LIVE ==="
