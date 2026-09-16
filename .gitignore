@@ -76,3 +76,6 @@ Thumbs.db
 .vscode/
 .idea/
 .playwright-mcp/
+
+# Deployment Session Records & Logs
+vpssession.md

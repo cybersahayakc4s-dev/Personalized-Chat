@@ -35,6 +35,8 @@ jobs:
         env:
           SECRET_KEY: "ci_pipeline_test_secret_key_at_least_32_characters_long"
           ENVIRONMENT: "testing"
+          INITIAL_ADMIN_EMAIL: "ci-admin@example.com"
+          INITIAL_ADMIN_PASSWORD: "CiTestAdminPassword!12345"
         run: |
           python -m pytest server/tests/test_api.py -v
 
@@ -88,6 +90,10 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           TARGET_SHA: ${{ github.sha }}
+          # Optional: pins company-nginx SSH host key when VPS_KNOWN_HOSTS is set.
+          # If unset, appleboy/ssh-action falls back to no-verification (never set
+          # disable_host_key_check explicitly; always pin the host key in CI).
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -98,7 +104,8 @@ jobs:
           script: |
             set -euo pipefail
             APP_DIR="/opt/company/apps/personalize-chat"
-            echo "=== [1/7] Navigating to application directory & loading environment ==="
+            COMPOSE_FILE="docker-compose.prod.yml"
+            echo "=== [1/8] Navigating to application directory & loading environment ==="
             cd "$APP_DIR"
 
             if [ -f .env ]; then
@@ -112,7 +119,7 @@ jobs:
               exit 1
             fi
 
-            echo "=== [2/7] Recording previous deployment state & inspecting migrations against deployed SHA ==="
+            echo "=== [2/8] Recording previous deployment state & inspecting migrations against deployed SHA ==="
             PREVIOUS_SHA=$(cat .last_deployed_sha 2>/dev/null || git rev-parse HEAD || echo "")
             echo "$PREVIOUS_SHA" > .last_deployed_sha
             echo "Current deployed SHA: $PREVIOUS_SHA"
@@ -136,48 +143,49 @@ jobs:
               fi
             fi
 
-            echo "=== [3/7] Creating pre-deployment database backup ==="
+            echo "=== [3/8] Creating pre-deployment database backup ==="
             mkdir -p backups
             BACKUP_FILE="backups/personalize_chat_backup_$(date +%Y%m%d_%H%M%S).sql"
-            if docker compose ps --services --filter "status=running" | grep -q "^db$"; then
+            if docker compose -f "$COMPOSE_FILE" ps --services --filter "status=running" | grep -q "^db$"; then
               echo "Dumping PostgreSQL database to $BACKUP_FILE..."
-              docker compose exec -T db pg_dump -U "${POSTGRES_USER:-personalize_chat_app}" "${POSTGRES_DB:-personalize_chat_prod}" > "$BACKUP_FILE" || {
+              docker compose -f "$COMPOSE_FILE" exec -T db pg_dump -U "${POSTGRES_USER:-personalize_chat_app}" "${POSTGRES_DB:-personalize_chat_prod}" > "$BACKUP_FILE" || {
                 echo "WARNING: Database backup failed or database container empty. Proceeding cautiously."
               }
             fi
 
-            echo "=== [4/7] Checking out exact target SHA: $TARGET_SHA ==="
+            echo "=== [4/8] Checking out exact target SHA: $TARGET_SHA ==="
             git checkout "$TARGET_SHA"
 
-            echo "=== [5/7] Building new images and running database migrations BEFORE service restart ==="
+            echo "=== [5/8] Building new images and running database migrations BEFORE service restart ==="
             # 1. Build new container images without restarting live containers yet
-            docker compose build server client
+            docker compose -f "$COMPOSE_FILE" build server client
 
             # 2. Ensure database container is running and healthy
-            docker compose up -d db
+            docker compose -f "$COMPOSE_FILE" up -d db
 
             # 3. Execute Alembic migrations using a one-off container with the NEW server image.
             # If migrations fail, the script exits immediately and running production services are NOT touched!
             echo "Applying Alembic migrations against newly built image..."
-            docker compose run --rm server alembic upgrade head
+            docker compose -f "$COMPOSE_FILE" run --rm server alembic upgrade head
 
-            echo "=== [6/7] Starting application containers with updated code and schema ==="
+            echo "=== [6/8] Starting application containers with updated code and schema ==="
             # Scoped strictly to Personalize Chat services to minimize interruption without affecting sibling apps
-            docker compose up -d server client
+            docker compose -f "$COMPOSE_FILE" up -d server client
 
-            echo "=== [7/7] Verifying application health check ==="
-            HEALTH_URL="http://127.0.0.1:${APP_PORT:-8085}/health"
+            # Belt-and-suspenders: guarantee the client container stays attached to the
+            # company-nginx ingress network regardless of container recreation ordering.
+            docker network connect company-internal personalize_chat_client 2>/dev/null || echo "client already attached to company-internal (or network pending); continuing"
+
+            echo "=== [7/8] Verifying application health check ==="
             HEALTHY=false
             for i in $(seq 1 12); do
-              echo "Health check probe $i/12 at $HEALTH_URL..."
-              HTTP_STATUS=$(curl -s -o /tmp/health_response.json -w "%{http_code}" "$HEALTH_URL" || true)
-              if [ "$HTTP_STATUS" = "200" ]; then
+              echo "Health check probe $i/12 (server container /health)..."
+              if docker compose -f "$COMPOSE_FILE" exec -T server curl -sf http://localhost:8000/health >/dev/null; then
                 echo "Health check PASS (HTTP 200)!"
-                cat /tmp/health_response.json
                 HEALTHY=true
                 break
               fi
-              echo "Service responded with HTTP $HTTP_STATUS. Waiting 5s..."
+              echo "Backend not yet healthy. Waiting 5s..."
               sleep 5
             done
 
@@ -186,12 +194,13 @@ jobs:
               if [ -n "$PREVIOUS_SHA" ]; then
                 echo "Rolling back code to previous SHA: $PREVIOUS_SHA"
                 git checkout "$PREVIOUS_SHA"
-                docker compose up -d --build server client
+                docker compose -f "$COMPOSE_FILE" up -d --build server client
+                docker network connect company-internal personalize_chat_client 2>/dev/null || echo "rollback network reattach skipped"
                 echo "Rollback containers deployed. Checking rollback health..."
                 sleep 5
-                curl -f "$HEALTH_URL" || echo "Rollback health check alert: manual inspection required!"
+                docker compose -f "$COMPOSE_FILE" exec -T server curl -sf http://localhost:8000/health || echo "Rollback health check alert: manual inspection required!"
               fi
               exit 1
             fi
 
-            echo "=== DEPLOYMENT SUCCESSFUL: Personalize Chat is LIVE ==="
+            echo "=== [8/8] DEPLOYMENT SUCCESSFUL: Personalize Chat is LIVE ==="

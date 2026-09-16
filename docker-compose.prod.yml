@@ -80,9 +80,10 @@ services:
     depends_on:
       server:
         condition: service_healthy
-    ports:
-      # Bound strictly to loopback interface to route through host company-nginx
-      - "127.0.0.1:${APP_PORT:-8085}:80"
+    # No host ports published: ingress is exclusively via the external
+    # company-internal network that hosts company-nginx. This mirrors the
+    # production topology used by CRM / AI HR and avoids port conflicts
+    # on the shared company VPS.
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80/healthz || exit 1"]
       interval: 10s
@@ -100,6 +101,7 @@ services:
         max-file: "5"
     networks:
       - personalize_chat_network
+      - company-internal
 
 volumes:
   pgdata:
@@ -111,3 +113,6 @@ networks:
   personalize_chat_network:
     name: personalize_chat_network
     internal: false
+  company-internal:
+    name: company-internal
+    external: true
