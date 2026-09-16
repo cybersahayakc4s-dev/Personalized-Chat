@@ -7,7 +7,7 @@
 
 # Local Persistent Data & Backups (Protected from Git Operations)
 backups/
-data/
+/data/
 *.sql
 *.sql.gz
 *.tar.gz
