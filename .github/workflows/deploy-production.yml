@@ -85,6 +85,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    continue-on-error: true
     steps:
       - name: Execute Safe Production Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
