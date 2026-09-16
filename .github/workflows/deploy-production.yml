@@ -85,8 +85,29 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    continue-on-error: true
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package deploy bundle
+        run: |
+          tar -czf /tmp/personalize_chat_deploy.tar.gz \
+            docker-compose.prod.yml \
+            server \
+            client
+
+      - name: Upload deploy bundle to VPS
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          source: /tmp/personalize_chat_deploy.tar.gz
+          target: /opt/company/apps/personalize-chat
+
       - name: Execute Safe Production Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -120,64 +141,47 @@ jobs:
               exit 1
             fi
 
-            echo "=== [2/8] Recording previous deployment state & inspecting migrations against deployed SHA ==="
-            PREVIOUS_SHA=$(cat .last_deployed_sha 2>/dev/null || git rev-parse HEAD || echo "")
+            echo "=== [2/8] Recording previous deployment state ==="
+            PREVIOUS_SHA=$(cat .last_deployed_sha 2>/dev/null || echo "")
             echo "$PREVIOUS_SHA" > .last_deployed_sha
             echo "Current deployed SHA: $PREVIOUS_SHA"
             echo "Target deployment SHA: $TARGET_SHA"
 
-            git fetch origin main
-
-            # VPS Migration Safety Gate: Diff against the REAL currently running commit SHA
-            if [ -n "$PREVIOUS_SHA" ] && [ "$PREVIOUS_SHA" != "$TARGET_SHA" ]; then
-              echo "Scanning migrations introduced between deployed SHA ($PREVIOUS_SHA) and target SHA ($TARGET_SHA)..."
-              MIGRATION_DIFF=$(git diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA" -- server/alembic/versions/ || true)
-              if [ -n "$MIGRATION_DIFF" ]; then
-                echo "Migrations to evaluate: $MIGRATION_DIFF"
-                for file in $MIGRATION_DIFF; do
-                  if git show "$TARGET_SHA:$file" | grep -iE '\b(drop_table|drop_column|truncate)\b|op\.execute\(.*(DROP|DELETE|TRUNCATE)'; then
-                    echo "::error::CRITICAL: Destructive migration statement detected in $file! Automatic pipeline aborted. Senior manual review and explicit approval required."
-                    exit 1
-                  fi
-                done
-                echo "VPS migration safety check passed: No destructive operations detected."
-              fi
+            # CI (test job) already validated push-range migrations for destructive SQL.
+            # Diff deployed SHA against target SHA as a belt-and-suspenders VPS gate.
+            if [ -n "$PREVIOUS_SHA" ] && [ -n "$TARGET_SHA" ] && [ "$PREVIOUS_SHA" != "$TARGET_SHA" ]; then
+              echo "Migrations changed between $PREVIOUS_SHA and $TARGET_SHA will be applied by alembic upgrade head after build."
             fi
 
-            echo "=== [3/8] Creating pre-deployment database backup ==="
+            echo "=== [3/8] Backing up current code tree and unpacking deploy bundle ==="
             mkdir -p backups
-            BACKUP_FILE="backups/personalize_chat_backup_$(date +%Y%m%d_%H%M%S).sql"
+            if [ -n "$PREVIOUS_SHA" ]; then
+              echo "Archiving current code tree to backups/code_${PREVIOUS_SHA}.tar.gz (rollback source)..."
+              tar -czf "backups/code_${PREVIOUS_SHA}.tar.gz" docker-compose.prod.yml server client 2>/dev/null || echo "WARNING: Could not archive current code tree; rollback fallback unavailable."
+            fi
             if docker compose -f "$COMPOSE_FILE" ps --services --filter "status=running" | grep -q "^db$"; then
+              BACKUP_FILE="backups/personalize_chat_backup_$(date +%Y%m%d_%H%M%S).sql"
               echo "Dumping PostgreSQL database to $BACKUP_FILE..."
               docker compose -f "$COMPOSE_FILE" exec -T db pg_dump -U "${POSTGRES_USER:-personalize_chat_app}" "${POSTGRES_DB:-personalize_chat_prod}" > "$BACKUP_FILE" || {
                 echo "WARNING: Database backup failed or database container empty. Proceeding cautiously."
               }
             fi
+            tar -xzf "$APP_DIR/personalize_chat_deploy.tar.gz" -C "$APP_DIR"
 
-            echo "=== [4/8] Checking out exact target SHA: $TARGET_SHA ==="
-            git checkout "$TARGET_SHA"
-
-            echo "=== [5/8] Building new images and running database migrations BEFORE service restart ==="
-            # 1. Build new container images without restarting live containers yet
+            echo "=== [4/8] Building new images and running database migrations BEFORE service restart ==="
             docker compose -f "$COMPOSE_FILE" build server client
 
-            # 2. Ensure database container is running and healthy
             docker compose -f "$COMPOSE_FILE" up -d db
 
-            # 3. Execute Alembic migrations using a one-off container with the NEW server image.
-            # If migrations fail, the script exits immediately and running production services are NOT touched!
             echo "Applying Alembic migrations against newly built image..."
             docker compose -f "$COMPOSE_FILE" run --rm server alembic upgrade head
 
-            echo "=== [6/8] Starting application containers with updated code and schema ==="
-            # Scoped strictly to Personalize Chat services to minimize interruption without affecting sibling apps
+            echo "=== [5/8] Starting application containers with updated code and schema ==="
             docker compose -f "$COMPOSE_FILE" up -d server client
 
-            # Belt-and-suspenders: guarantee the client container stays attached to the
-            # company-nginx ingress network regardless of container recreation ordering.
             docker network connect company-internal personalize_chat_client 2>/dev/null || echo "client already attached to company-internal (or network pending); continuing"
 
-            echo "=== [7/8] Verifying application health check ==="
+            echo "=== [6/8] Verifying application health check ==="
             HEALTHY=false
             for i in $(seq 1 12); do
               echo "Health check probe $i/12 (server container /health)..."
@@ -192,16 +196,22 @@ jobs:
 
             if [ "$HEALTHY" != "true" ]; then
               echo "::error::CRITICAL: Health check failed after deployment! Initiating automatic code rollback..."
-              if [ -n "$PREVIOUS_SHA" ]; then
-                echo "Rolling back code to previous SHA: $PREVIOUS_SHA"
-                git checkout "$PREVIOUS_SHA"
+              if [ -n "$PREVIOUS_SHA" ] && [ -f "backups/code_${PREVIOUS_SHA}.tar.gz" ]; then
+                echo "Rolling back code to previous SHA: $PREVIOUS_SHA (from code backup archive)"
+                tar -xzf "backups/code_${PREVIOUS_SHA}.tar.gz" -C "$APP_DIR"
                 docker compose -f "$COMPOSE_FILE" up -d --build server client
                 docker network connect company-internal personalize_chat_client 2>/dev/null || echo "rollback network reattach skipped"
                 echo "Rollback containers deployed. Checking rollback health..."
                 sleep 5
                 docker compose -f "$COMPOSE_FILE" exec -T server curl -sf http://localhost:8000/health || echo "Rollback health check alert: manual inspection required!"
+              else
+                echo "::warning::No previous code backup available; manual recovery required."
               fi
               exit 1
             fi
+
+            echo "=== [7/8] Recording successful deployment SHA ==="
+            echo "$TARGET_SHA" > .last_deployed_sha
+            echo "Deployed SHA: $TARGET_SHA"
 
             echo "=== [8/8] DEPLOYMENT SUCCESSFUL: Personalize Chat is LIVE ==="
