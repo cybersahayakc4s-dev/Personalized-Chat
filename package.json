@@ -1,0 +1,45 @@
+{
+  "name": "personalize-chat-desktop",
+  "version": "2.2.0",
+  "description": "Personalize Chat Sovereign Desktop Application",
+  "main": "electron/main.js",
+  "scripts": {
+    "client:build": "npm --prefix client run build",
+    "electron:start": "electron .",
+    "dist": "npm run client:build && electron-builder --win nsis --x64",
+    "dist:dir": "npm run client:build && electron-builder --win --dir --x64",
+    "test:security": "node scripts/test_security_regression.cjs"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.personalize.chat",
+    "productName": "Personalize Chat",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "client/dist/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "client/public/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

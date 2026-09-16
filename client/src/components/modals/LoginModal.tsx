@@ -9,8 +9,11 @@ import {
   X,
   Eye,
   EyeOff,
-  Lock
+  Lock,
+  Server,
+  Check
 } from 'lucide-react';
+import { getServerBaseUrl, setServerBaseUrl } from '../../services/api';
 
 interface LoginModalProps {
   isStandalone?: boolean;
@@ -32,6 +35,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isStandalone = false }) 
   const [rememberEmail, setRememberEmail] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showServerSettings, setShowServerSettings] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(() => getServerBaseUrl());
+  const [serverSavedMsg, setServerSavedMsg] = useState(false);
 
   // Sync state whenever the login modal is opened
   useEffect(() => {
@@ -40,8 +46,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isStandalone = false }) 
       setEmail(savedEmail);
       setPassword('');
       setError(null);
+      setServerUrlInput(getServerBaseUrl());
     }
   }, [loginModalOpen, currentUser]);
+
+  const handleSaveServerUrl = () => {
+    setServerBaseUrl(serverUrlInput);
+    setServerSavedMsg(true);
+    setTimeout(() => setServerSavedMsg(false), 2500);
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +79,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isStandalone = false }) 
       setPassword('');
       setLoginModalOpen(false);
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify your credentials.');
+      const errMsg = err.message || 'Authentication failed. Please verify your credentials.';
+      if (errMsg.toLowerCase().includes('failed to fetch') || errMsg.toLowerCase().includes('networkerror')) {
+        setError(`Unable to connect to server at ${getServerBaseUrl() || 'http://localhost:8000'}. Check network or Server Settings below.`);
+        setShowServerSettings(true);
+      } else {
+        setError(errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -217,6 +236,54 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isStandalone = false }) 
               <LogIn className="w-4 h-4" />
               <span>{loading ? 'Authenticating...' : 'Sign In to Workspace'}</span>
             </button>
+
+            {/* Server Settings Toggle */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowServerSettings(!showServerSettings)}
+                className={`text-[11px] flex items-center gap-1.5 transition cursor-pointer ${
+                  isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5 text-blue-500" />
+                <span>{showServerSettings ? 'Hide Server Settings' : 'Server Connection Settings'}</span>
+              </button>
+
+              {showServerSettings && (
+                <div className={`mt-2 p-3 rounded-xl border ${
+                  isDark ? 'bg-zinc-950/80 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                } space-y-2 animate-in fade-in duration-150`}>
+                  <label className={`block text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    Backend Server URL
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={serverUrlInput}
+                      onChange={(e) => setServerUrlInput(e.target.value)}
+                      placeholder="http://localhost:8000 or https://chat.company.com"
+                      className={`flex-1 h-8 px-2.5 rounded-lg border text-xs font-mono focus:outline-hidden transition-colors ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500'
+                          : 'bg-white border-slate-300 text-slate-900 focus:border-blue-500'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveServerUrl}
+                      className="px-3 h-8 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium cursor-pointer flex items-center gap-1 shrink-0"
+                    >
+                      {serverSavedMsg ? <Check className="w-3.5 h-3.5 text-white" /> : null}
+                      <span>{serverSavedMsg ? 'Saved' : 'Save'}</span>
+                    </button>
+                  </div>
+                  <p className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
+                    Current: <span className="font-mono text-blue-400">{getServerBaseUrl() || 'http://localhost:8000 (Default)'}</span>
+                  </p>
+                </div>
+              )}
+            </div>
           </form>
 
           <div className="pt-3 border-t border-slate-800/40 flex items-center justify-between text-[11px]">

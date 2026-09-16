@@ -125,7 +125,7 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
             <span className="truncate">In {conversationName}</span>
           </div>
 
-          <div className="relative flex-1 min-w-[130px]">
+          <div className="relative flex-1 min-w-0">
             <input
               ref={inputRef}
               type="text"

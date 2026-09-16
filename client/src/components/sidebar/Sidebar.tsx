@@ -22,6 +22,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { isChannelAuthorized } from '../../utils/rbac';
+import { TeamUpdatesCarousel } from './TeamUpdatesCarousel';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -36,6 +37,7 @@ export const Sidebar: React.FC = () => {
     setNewDmModalOpen,
     setCommandPaletteOpen,
     setLoginModalOpen,
+    setScheduleUpdateModalOpen,
     sidebarMobileOpen,
     setSidebarMobileOpen,
     setProfileModalUser,
@@ -161,7 +163,7 @@ export const Sidebar: React.FC = () => {
                 <ShieldCheck className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
               </div>
               <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                <span>C4S-Connector • v1.3.1</span>
+                <span>C4S-Connector • v2.2.0</span>
               </div>
             </div>
           </div>
@@ -288,13 +290,15 @@ export const Sidebar: React.FC = () => {
           <div>
             <div className="px-2 py-1 flex items-center justify-between text-[11px] font-semibold tracking-wider uppercase text-slate-400">
               <span>Departments</span>
-              <button
-                onClick={() => setNewChannelModalOpen(true)}
-                className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition-colors"
-                title="Department settings"
-              >
-                <FolderClosed className="w-3.5 h-3.5 text-slate-400" />
-              </button>
+              {currentUser.role === 'main_admin' && (
+                <button
+                  onClick={() => setNewChannelModalOpen(true)}
+                  className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition-colors"
+                  title="Create channel"
+                >
+                  <FolderClosed className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+              )}
             </div>
 
             <div className="space-y-0.5 mt-1">
@@ -453,6 +457,11 @@ export const Sidebar: React.FC = () => {
             </div>
           </div>
 
+          {/* Main-Admin Daily Team Updates Carousel */}
+          {isMainAdmin && (
+            <TeamUpdatesCarousel onOpenScheduler={() => setScheduleUpdateModalOpen(true)} />
+          )}
+
           {/* Section: Direct Messages */}
           <div>
             <div className="px-2 py-1 flex items-center justify-between text-[11px] font-semibold tracking-wider uppercase text-slate-400">
@@ -485,7 +494,7 @@ export const Sidebar: React.FC = () => {
                   const p2 = Math.max(Number(currentNumeric), Number(otherNumeric));
                   const dmId = `dm-${p1}-${p2}`;
                   const isActive = activeConversationId === dmId || activeConversationId.includes(user.id.replace('usr_', '')) || activeConversationId.includes(user.handle);
-                  const unread = isActive ? 0 : (unreadCounts[dmId] !== undefined ? unreadCounts[dmId] : (unreadCounts[user.id] !== undefined ? unreadCounts[user.id] : 0));
+                  const unread = isActive ? 0 : (unreadCounts[dmId] || 0);
 
                   return (
                     <button

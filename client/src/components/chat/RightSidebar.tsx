@@ -16,6 +16,17 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { User, Attachment } from '../../types';
+import { getServerBaseUrl } from '../../services/api';
+import { getTeamNameFromConversationId } from '../../utils/rbac';
+
+const resolveMediaUrl = (url?: string): string => {
+  if (!url || url === '#') return '#';
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const base = getServerBaseUrl() || (typeof window !== 'undefined' && window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000');
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+};
 
 export const RightSidebar: React.FC = () => {
   const {
@@ -31,7 +42,8 @@ export const RightSidebar: React.FC = () => {
     isDm,
     createOrOpenDm,
     setProfileModalUser,
-    theme
+    theme,
+    channels
   } = useChat() as any;
 
   const isOpen = rightSidebarOpen || pinnedDrawerOpen;
@@ -43,7 +55,6 @@ export const RightSidebar: React.FC = () => {
   };
 
   const isDark = theme !== 'nordic';
-  const [memberScope, setMemberScope] = useState<'channel' | 'all'>('channel');
 
   // 1. Current conversation messages
   const currentMessages = (messages || []).filter(
@@ -69,18 +80,26 @@ export const RightSidebar: React.FC = () => {
     }
   });
 
-  // 4. Relevant Members (Only for Channels / Teams / Groups - OMITTED for 1:1 DMs)
-  const teamChannelTeam = !isDm && (activeConversation as any)?.type === 'team'
-    ? (activeConversation as any)?.team
+  // 4. Relevant Members (Filtered to active users only; strictly isolated for department channels)
+  const activeUsers = (users || []).filter((u: any) =>
+    u.account_status !== 'deleted' &&
+    u.status !== 'deleted' &&
+    !u.is_deleted &&
+    !u.name?.includes('[Deleted User]') &&
+    !(u.email && u.email?.includes('@archived.internal'))
+  );
+
+  const teamChannelTeam = !isDm && ((activeConversation as any)?.type === 'team' || (activeConversation as any)?.team)
+    ? ((activeConversation as any)?.team || getTeamNameFromConversationId(channels || [], activeConversation?.id))
     : null;
 
   const channelMembers: User[] = !isDm
     ? teamChannelTeam
-      ? (users || []).filter((u: any) => u.team === teamChannelTeam || u.role === 'main_admin')
-      : (users || [])
+      ? activeUsers.filter((u: any) => u.team === teamChannelTeam || u.role === 'main_admin')
+      : activeUsers
     : [];
 
-  const displayedMembers: User[] = memberScope === 'all' ? (users || []) : channelMembers;
+  const displayedMembers: User[] = channelMembers;
 
   const getFileIcon = (fileName: string = '', type: string = '') => {
     const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
@@ -194,32 +213,11 @@ export const RightSidebar: React.FC = () => {
                 <Users className="w-3.5 h-3.5 text-blue-400" />
                 <span>Members of the Chat</span>
               </div>
-              <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-black/30 p-0.5 rounded-md text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setMemberScope('channel')}
-                  className={`px-1.5 py-0.5 rounded transition ${
-                    memberScope === 'channel'
-                      ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title="Show members of this channel"
-                >
-                  Channel ({channelMembers.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMemberScope('all')}
-                  className={`px-1.5 py-0.5 rounded transition ${
-                    memberScope === 'all'
-                      ? 'bg-blue-600 text-white font-medium shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                  title="Show all workspace members"
-                >
-                  All ({users?.length || 0})
-                </button>
-              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium font-mono ${
+                isDark ? 'bg-blue-500/10 text-blue-300 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-200'
+              }`}>
+                {channelMembers.length}
+              </span>
             </div>
 
             <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
@@ -327,7 +325,7 @@ export const RightSidebar: React.FC = () => {
                   </div>
 
                   <a
-                    href={file.url}
+                    href={resolveMediaUrl(file.downloadUrl || file.url)}
                     download={file.name}
                     className={`p-1.5 rounded-md transition-colors ml-2 flex-shrink-0 ${
                       isDark

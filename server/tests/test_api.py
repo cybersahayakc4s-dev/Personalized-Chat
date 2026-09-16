@@ -23,6 +23,7 @@ from app.models.team_settings import TeamSettings
 from app.models.message import Message
 from app.models.attachment import Attachment
 from app.models.refresh_token import RefreshToken
+from app.models.audit_log import AuditLog
 from app.core.security import hash_token, generate_refresh_token
 
 def override_get_db():
@@ -1604,6 +1605,9 @@ def test_admin_password_immutability_on_reinitialization():
     assert verify_password(custom_password, admin_recheck.password_hash) is True, \
         "SECURITY FLAW: init_db() overwritten custom administrator password!"
     assert verify_password(settings.INITIAL_ADMIN_PASSWORD, admin_recheck.password_hash) is False
+    # Restore original password for subsequent test isolation
+    admin_recheck.password_hash = get_password_hash(settings.INITIAL_ADMIN_PASSWORD)
+    db2.commit()
     db2.close()
 
 
@@ -1711,9 +1715,300 @@ def test_cleanup_attachments_utility(tmp_path):
     assert is_safe_subpath(os.path.join(upload_test_dir, "safe_file.txt"), upload_test_dir) is True
 
 
+# ZERO-BACKDOOR DM CONFIDENTIALITY TESTS
+def test_zero_backdoor_message_list_exclusion():
+    """Guarantee 1: Main-Admin unfiltered GET /api/messages excludes employee 1:1 DMs."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+
+    secret_dm_content = "ZERO_BACKDOOR_LIST_SECRET_101"
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": secret_dm_content
+    })
+    assert dm_res.status_code == 200
+
+    team_msg_content = "ZERO_BACKDOOR_TEAM_LEGAL_BROADCAST_101"
+    team_res = client.post("/api/messages", headers=alice_headers, json={
+        "team": "team_legal",
+        "content": team_msg_content
+    })
+    assert team_res.status_code == 200
+
+    admin_feed_res = client.get("/api/messages?limit=100", headers=admin_headers)
+    assert admin_feed_res.status_code == 200
+    admin_contents = [m["content"] for m in admin_feed_res.json() if m.get("content")]
+
+    assert team_msg_content in admin_contents
+    assert secret_dm_content not in admin_contents
 
 
 
+def test_zero_backdoor_attachment_403():
+    """Guarantee 2: Main-Admin blocked with 403 from viewing or downloading employee DM attachments."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+
+    att_file_payload = {"file": ("confidential_spec.pdf", b"%PDF-1.4 confidential private data", "application/pdf")}
+    att_upload = client.post(
+        "/api/attachments/upload",
+        headers=alice_headers,
+        files=att_file_payload,
+        data={"receiver_id": bob_id}
+    )
+    assert att_upload.status_code == 200
+    dm_attachment_id = att_upload.json()["attachments"][0]["id"]
+
+    admin_view_res = client.get(f"/api/attachments/{dm_attachment_id}/view", headers=admin_headers)
+    assert admin_view_res.status_code == 403
+    assert "Not authorized to view" in admin_view_res.json()["detail"]
+
+    admin_dl_res = client.get(f"/api/attachments/{dm_attachment_id}/download", headers=admin_headers)
+    assert admin_dl_res.status_code == 403
+    assert "Not authorized to download" in admin_dl_res.json()["detail"]
+
+    bob_view_res = client.get(f"/api/attachments/{dm_attachment_id}/view", headers=bob_headers)
+    assert bob_view_res.status_code == 200
 
 
 
+def test_zero_backdoor_search_exclusion():
+    """Guarantee 3: Main-Admin workspace search excludes employee 1:1 DMs."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+    search_keyword = "ZERO_BACKDOOR_SEARCH_QUERY_XYZ_303"
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": f"Secret document containing {search_keyword} inside"
+    })
+    assert dm_res.status_code == 200
+
+    admin_search = client.get(f"/api/messages/search?q={search_keyword}", headers=admin_headers)
+    assert admin_search.status_code == 200
+    assert len(admin_search.json()["messages"]) == 0
+    assert len(admin_search.json()["files"]) == 0
+
+    alice_search = client.get(f"/api/messages/search?q={search_keyword}", headers=alice_headers)
+    assert alice_search.status_code == 200
+    assert any(search_keyword in m["content"] for m in alice_search.json()["messages"])
+
+    bob_search = client.get(f"/api/messages/search?q={search_keyword}", headers=bob_headers)
+    assert bob_search.status_code == 200
+    assert any(search_keyword in m["content"] for m in bob_search.json()["messages"])
+
+
+
+def test_zero_backdoor_thread_403():
+    """Guarantee 4: Main-Admin blocked with 403 from inspecting employee DM threads."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": "Root message for thread test"
+    })
+    assert dm_res.status_code == 200
+    dm_msg_id = dm_res.json()["id"]
+
+    thread_res = client.get(f"/api/messages/{dm_msg_id}/thread", headers=admin_headers)
+    assert thread_res.status_code in [403, 404]
+
+    bob_thread = client.get(f"/api/messages/{dm_msg_id}/thread", headers=bob_headers)
+    assert bob_thread.status_code == 200
+
+
+
+def test_zero_backdoor_reactions_pin_403():
+    """Guarantee 5: Main-Admin blocked with 403 from reacting to or pinning employee DMs."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": "Message for reaction and pin test"
+    })
+    assert dm_res.status_code == 200
+    dm_msg_id = dm_res.json()["id"]
+
+    react_res = client.post(f"/api/messages/{dm_msg_id}/reactions", headers=admin_headers, json={"emoji": "👀"})
+    assert react_res.status_code == 403
+
+    pin_res = client.post(f"/api/messages/{dm_msg_id}/pin", headers=admin_headers, json={"is_pinned": True})
+    assert pin_res.status_code in [403, 404]
+
+    bob_react = client.post(f"/api/messages/{dm_msg_id}/reactions", headers=bob_headers, json={"emoji": "👍"})
+    assert bob_react.status_code == 200
+
+    bob_pin = client.post(f"/api/messages/{dm_msg_id}/pin", headers=bob_headers, json={"is_pinned": True})
+    assert bob_pin.status_code == 200
+
+
+
+def test_zero_backdoor_delete_restriction():
+    """Guarantee 6: Employee DMs can only be deleted by the original sender (owner)."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": "Message for delete restriction test"
+    })
+    assert dm_res.status_code == 200
+    dm_msg_id = dm_res.json()["id"]
+
+    admin_del = client.delete(f"/api/messages/{dm_msg_id}", headers=admin_headers)
+    assert admin_del.status_code == 403
+    assert "only delete your own direct messages" in admin_del.json()["detail"]
+
+    bob_del = client.delete(f"/api/messages/{dm_msg_id}", headers=bob_headers)
+    assert bob_del.status_code == 403
+
+    alice_del = client.delete(f"/api/messages/{dm_msg_id}", headers=alice_headers)
+    assert alice_del.status_code == 200
+
+
+
+def test_zero_backdoor_audit_log_content_check():
+    """Guarantee 7: Audit logs contain zero message content or DM file content."""
+    alice_token = get_token("alice@company.internal", "Password@123")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_token = get_token("bob@company.internal", "Password@123")
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = client.get("/api/auth/me", headers=bob_headers).json()["id"]
+    unique_audit_marker = "AUDIT_LOG_PRIVACY_VERIFICATION_MARKER_9999"
+    dm_res = client.post("/api/messages", headers=alice_headers, json={
+        "receiver_id": bob_id,
+        "content": unique_audit_marker
+    })
+    assert dm_res.status_code == 200
+
+    db = TestingSessionLocal()
+    all_audit_logs = db.query(AuditLog).all()
+    for log in all_audit_logs:
+        details_text = log.details or ""
+        assert unique_audit_marker not in details_text
+    db.close()
+
+
+# ==============================================================================
+# REMEDIATION TESTS: I-1 (Reaction IDOR) & C-1 (Production Wildcard CORS)
+# ==============================================================================
+
+def test_cross_team_reaction_does_not_leak_message():
+    """Remediation I-1: Prevent cross-team message reading via reaction IDOR."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    x_token = get_token("user.x@company.internal", "Password@123")  # team_ai member
+    x_headers = {"Authorization": f"Bearer {x_token}"}
+    y_token = get_token("user.y@company.internal", "Password@123")  # team_ai member
+    y_headers = {"Authorization": f"Bearer {y_token}"}
+    z_token = get_token("user.z@company.internal", "Password@123")  # team_legal member
+    z_headers = {"Authorization": f"Bearer {z_token}"}
+
+    # 1. User X in team_ai posts confidential message with attachment
+    secret_text = "AI_CONFIDENTIAL_AUDIT_REPORT_XYZ_987"
+    att_payload = {"file": ("privilege.pdf", b"%PDF-1.4 confidential ai data", "application/pdf")}
+    upload_res = client.post(
+        "/api/attachments/upload",
+        headers=x_headers,
+        files=att_payload,
+        data={"team": "team_ai", "content": secret_text}
+    )
+    assert upload_res.status_code == 200
+    team_msg_id = upload_res.json()["id"]
+
+    # 2. User Z in team_legal attempts to react to User X's team_ai message
+    unauth_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=z_headers,
+        json={"emoji": "👀"}
+    )
+    # Must be denied (404 Not Found prevents using endpoint as IDOR oracle)
+    assert unauth_react.status_code in [403, 404]
+    # Crucial security assertion: response body must not leak message content or attachment info
+    assert secret_text not in unauth_react.text
+    assert "privilege.pdf" not in unauth_react.text
+
+    # 3. Legitimate authorized user in team_ai (User Y) can react successfully
+    auth_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=y_headers,
+        json={"emoji": "👍"}
+    )
+    assert auth_react.status_code == 200
+    y_id = client.get("/api/auth/me", headers=y_headers).json()["id"]
+    assert auth_react.json()["reactions"]["👍"] == [y_id]
+
+    # 4. Main-Admin (company oversight) can react under existing team policy
+    admin_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=admin_headers,
+        json={"emoji": "✅"}
+    )
+    assert admin_react.status_code == 200
+
+
+def test_startup_validation_production_wildcard_cors_rejection():
+    """Remediation C-1: Verify startup validation rejects wildcard ALLOWED_ORIGINS='*' in production."""
+    from app.core.config import Settings
+    with pytest.raises(Exception) as exc_info:
+        Settings(
+            SECRET_KEY="012345678901234567890123456789012",
+            DATABASE_URL="sqlite:///test.db",
+            INITIAL_ADMIN_EMAIL="admin@company.internal",
+            INITIAL_ADMIN_PASSWORD="Admin@123456",
+            ENVIRONMENT="production",
+            ALLOWED_ORIGINS="*"
+        )
+    err_str = str(exc_info.value)
+    assert "Wildcard origin '*' is strictly prohibited in production" in err_str
+
+
+def test_startup_validation_production_explicit_origin_acceptance():
+    """Remediation C-1: Verify startup validation accepts legitimate explicit production origin with file/null."""
+    from app.core.config import Settings
+    s = Settings(
+        SECRET_KEY="012345678901234567890123456789012",
+        DATABASE_URL="sqlite:///test.db",
+        INITIAL_ADMIN_EMAIL="admin@company.internal",
+        INITIAL_ADMIN_PASSWORD="Admin@123456",
+        ENVIRONMENT="production",
+        ALLOWED_ORIGINS="https://chat.company.internal"
+    )
+    assert "https://chat.company.internal" in s.cors_origins
+    assert "file://" in s.cors_origins
+    assert "null" in s.cors_origins

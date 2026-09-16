@@ -8,6 +8,7 @@ export const NewChannelModal: React.FC = () => {
     newChannelModalOpen,
     setNewChannelModalOpen,
     currentUser,
+    users,
     createChannel
   } = useChat();
 
@@ -20,6 +21,12 @@ export const NewChannelModal: React.FC = () => {
   if (!newChannelModalOpen) return null;
 
   if (currentUser.role !== 'main_admin') {
+    // Dynamically resolve the actual Main Admin name/handle instead of hardcoded placeholder
+    const mainAdminUser = (users as any[]).find((u: any) => u.role === 'main_admin');
+    const adminLabel = mainAdminUser
+      ? `${mainAdminUser.name} (@${mainAdminUser.handle})`
+      : 'the Main Admin';
+
     return (
       <div
         onClick={(e) => {
@@ -34,7 +41,7 @@ export const NewChannelModal: React.FC = () => {
           <ShieldAlert className="w-8 h-8 text-amber-400 mx-auto mb-2" />
           <h3 className="font-semibold text-[#F1F5F9] text-[15px]">Permission Required</h3>
           <p className="text-xs text-[#94A3B8] mt-1">
-            Only Main-Admin (`alex.vance`) can create organizational and team channels.
+            Only the Main Admin ({adminLabel}) has permission to create organizational and department channels.
           </p>
           <button
             type="button"

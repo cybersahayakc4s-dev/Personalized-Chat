@@ -1,6 +1,8 @@
 // Desktop Notification Service for Windows Bottom-Right Popups (WhatsApp Web / Slack style)
 // Uses Service Worker registration where available to ensure delivery even when Chrome is minimized
 
+import { getServerBaseUrl } from './api';
+
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'default' | 'unsupported';
 
 let swRegistration: ServiceWorkerRegistration | null = null;
@@ -93,7 +95,7 @@ export async function sendTestDesktopNotification(param?: number | TestNotificat
     const title = 'C4S-Connector • Notifications Active';
     const targetConv = opts.conversationId || 'c-team-ai';
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : null;
-    const apiUrl = typeof window !== 'undefined' ? (localStorage.getItem('chat_server_base_url') || window.location.origin) : '';
+    const apiUrl = getServerBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
 
     const notifOptions: any = {
       body: 'Windows desktop popups are working! Try typing a reply in the box below.',
@@ -198,7 +200,7 @@ export async function showIncomingMessageNotification(opts: IncomingMessageNotif
     const iconUrl = `${origin}/icon-192.png`;
     const badgeUrl = `${origin}/icon-192.png`;
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : null;
-    const apiUrl = typeof window !== 'undefined' ? (localStorage.getItem('chat_server_base_url') || window.location.origin) : '';
+    const apiUrl = getServerBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
     const notifActions: any[] = [];
     if (opts.canReply !== false) {
       notifActions.push({

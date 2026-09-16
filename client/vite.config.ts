@@ -4,6 +4,15 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 export default defineConfig({
+  root: __dirname,
+  base: './',
+  define: {
+    'import.meta.env.VITE_CHAT_SERVER_BASE_URL': JSON.stringify(process.env.VITE_CHAT_SERVER_BASE_URL || ''),
+  },
+  build: {
+    outDir: path.resolve(__dirname, 'dist'),
+    emptyOutDir: true,
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

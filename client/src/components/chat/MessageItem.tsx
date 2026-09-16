@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Message, User, Attachment } from '../../types';
+import { Message, User, Attachment, TeamId } from '../../types';
 import { useChat } from '../../context/ChatContext';
+import { TEAMS_META } from '../../data/initialData';
 import { Avatar } from '../common/Avatar';
 import { TeamBadge, RoleBadge } from '../common/Badge';
 import { MessageBubble } from './MessageBubble';
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react';
 import { applySmartFormatting, handleSmartEnter, handleFormattingShortcuts, FormatType } from '../../utils/textFormatting';
 import { getUserColor } from '../../utils/userColors';
+import { getServerBaseUrl } from '../../services/api';
 
 interface MessageItemProps {
   message: Message;
@@ -44,6 +46,15 @@ interface MessageItemProps {
 }
 
 const COMMON_EMOJIS = ['👍', '❤️', '🔥', '🚀', '🔒', '💡', '👀', '🎉'];
+
+const resolveMediaUrl = (url?: string): string => {
+  if (!url || url === '#') return '#';
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const base = getServerBaseUrl() || (typeof window !== 'undefined' && window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000');
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+};
 
 const isImageAttachment = (att: Attachment) => {
   return att.type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(att.name);
@@ -75,13 +86,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const {
     currentUser,
+    activeConversationId,
+    activeConversation,
     toggleReaction,
     togglePinMessage,
     editMessage,
     deleteMessage,
     retrySendMessage,
+    dismissFailedMessage,
     setProfileModalUser,
     messages,
+    setReplyingToMessage,
+    setHighlightedMessageId,
     addToast,
     theme
   } = useChat() as any;
@@ -109,8 +125,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     message.content === 'Message deleted by Admin'
   );
 
-  // Can delete: own message, or Main-Admin for channel messages (never if already deleted)
-  const canDelete = !isDeleted && (isOwnMessage || currentUser.role === 'main_admin');
+  // Check if message belongs to a 1:1 direct message conversation
+  const isDm = Boolean(
+    message.conversationId?.startsWith('dm-') ||
+    activeConversationId?.startsWith('dm-') ||
+    (activeConversation as any)?.type === 'dm'
+  );
+
+  // Can delete: own message always (unless deleted).
+  // Main-Admin can only delete channel / team messages (zero-backdoor DM rule: never another user's DM).
+  const canDelete = !isDeleted && (
+    isOwnMessage ||
+    (!isDm && currentUser?.role === 'main_admin')
+  );
   const canEdit = !isDeleted && isOwnMessage;
 
   const handleDelete = () => {
@@ -176,12 +203,83 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   };
 
   const senderColor = getUserColor(sender.id, sender.name);
+  const hasText = Boolean(message.content && message.content.trim().length > 0);
+
+  const renderStatus = () => (
+    <div className={`flex items-center gap-1.5 text-[10px] font-mono select-none ${
+      isOwnMessage ? 'justify-end text-slate-400/90' : 'justify-start text-slate-400/90'
+    }`}>
+      {message.editedAt && (
+        <span className="italic text-[9px] text-slate-400/75">(edited)</span>
+      )}
+
+      {message.status === 'failed' ? (
+        <span className="inline-flex items-center gap-1.5 text-rose-400 font-mono text-[10px]">
+          <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+          <span>Failed to send{message.sendError ? `: ${message.sendError}` : ''}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              retrySendMessage(message.id);
+            }}
+            className="ml-1 px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold cursor-pointer underline transition-colors"
+            title={message.sendError || "Retry sending"}
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              dismissFailedMessage(message.id);
+            }}
+            className="ml-1 px-1.5 py-0.5 rounded bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 font-semibold cursor-pointer transition-colors"
+            title="Dismiss failed message"
+          >
+            Dismiss
+          </button>
+        </span>
+      ) : message.status === 'sending' ? (
+        <span className="inline-flex items-center gap-1 text-slate-400/80 font-mono text-[10px] italic">
+          <span className="w-2 h-2 rounded-full border border-slate-400 border-t-transparent animate-spin inline-block" />
+          <span>Sending...</span>
+        </span>
+      ) : isOwnMessage && message.conversationId?.startsWith('dm-') ? (
+        message.readAt ? (
+          <span className="inline-flex items-center gap-1 text-slate-400 font-mono" title={`Sent: ${timeStr} • Seen: ${new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}>
+            <span>Sent {timeStr}</span>
+            <span className="opacity-60">•</span>
+            <span className="text-blue-400 font-medium">Seen {new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-blue-400 font-bold tracking-[-2px] ml-0.5">✓✓</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-slate-400 font-mono" title={`Sent: ${timeStr} • Delivered`}>
+            <span>Sent {timeStr}</span>
+            <span className="opacity-60">•</span>
+            <span className="text-slate-400">Delivered</span>
+            <span className="text-slate-400 font-bold ml-0.5">✓</span>
+          </span>
+        )
+      ) : (
+        <span>{timeStr}</span>
+      )}
+    </div>
+  );
+
+  const isUpdatesChannel = message.format === 'channel:updates' ||
+    activeConversationId === 'c-updates' ||
+    (activeConversation as any)?.id === 'c-updates' ||
+    (activeConversation as any)?.name === 'updates';
+  const senderTeamName = (sender.team && TEAMS_META[sender.team as TeamId]?.name) ||
+    sender.team ||
+    (sender.role === 'main_admin' ? 'Main Admin' : 'Workspace Member');
 
   return (
     <div
       id={`msg-${message.id}`}
-      className={`group relative flex gap-2.5 px-4 py-1.5 transition-colors ${
-        isOwnMessage ? 'justify-end' : 'justify-start items-start'
+      className={`group/row relative flex items-start gap-2.5 px-4 py-1.5 transition-colors ${
+        isOwnMessage ? 'justify-end' : 'justify-start'
       } ${
         isHighlighted
           ? 'bg-amber-500/15 border-l-4 border-amber-500 shadow-xs'
@@ -201,12 +299,58 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         </button>
       )}
 
-      {/* Message Content Container */}
-      <div className={`flex flex-col min-w-0 max-w-[88%] sm:max-w-[74%] ${
+      {/* WhatsApp-style side hover buttons for own messages: placed to the LEFT of the bubble */}
+      {isOwnMessage && !isDeleted && (
+        <div className="self-center hidden sm:flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity mr-1.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+              isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200'
+            }`}
+            title="React"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setReplyingToMessage(message)}
+            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+              isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200'
+            }`}
+            title="Reply"
+          >
+            <Reply className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Message Content Container — position:relative so the action toolbar can be absolute inside it */}
+      <div className={`relative flex flex-col min-w-0 max-w-[88%] sm:max-w-[74%] ${
         isOwnMessage ? 'items-end' : 'items-start'
       }`}>
-        {/* Header: ONLY for incoming messages */}
-        {!isOwnMessage && (
+        {/* Header: In #updates channel show sender + team badge; otherwise show on incoming */}
+        {isUpdatesChannel ? (
+          <div className={`flex items-center gap-1.5 mb-1 select-none ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+            <button
+              onClick={() => setProfileModalUser(sender)}
+              style={{ color: senderColor }}
+              className="font-semibold text-xs hover:underline cursor-pointer"
+            >
+              {sender.name}
+            </button>
+            <span className="text-slate-400 font-mono text-[10px]">•</span>
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              {senderTeamName}
+            </span>
+            {message.isPinned && (
+              <span className="inline-flex items-center gap-1 text-[9px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                <Pin className="w-2.5 h-2.5 text-amber-400" />
+                Pinned
+              </span>
+            )}
+          </div>
+        ) : !isOwnMessage ? (
           <div className="flex items-center gap-2 mb-1">
             <button
               onClick={() => setProfileModalUser(sender)}
@@ -229,19 +373,29 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               </span>
             )}
           </div>
-        )}
+        ) : null}
 
-        {/* Replying Context quote if present */}
+        {/* Replying Context quote if present — Clicking jumps to original message */}
         {repliedMessage && (
-          <div className={`mb-1.5 pl-2.5 border-l-2 text-xs flex items-center gap-1.5 truncate py-1 px-2.5 rounded-r-md max-w-full ${
-            isDark
-              ? 'border-blue-400 bg-slate-800/60 text-slate-300'
-              : 'border-blue-500 bg-slate-100 text-slate-700'
-          }`}>
-            <Reply className="w-3 h-3 text-blue-400 flex-shrink-0" />
-            <span className="text-slate-400 font-medium">Replying to:</span>
-            <span className="italic truncate text-slate-300">{repliedMessage.content}</span>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHighlightedMessageId(repliedMessage.id);
+            }}
+            className={`mb-1.5 pl-2.5 border-l-3 text-xs flex items-center gap-1.5 truncate py-1.5 px-2.5 rounded-r-md max-w-full text-left cursor-pointer transition-all hover:opacity-85 ${
+              isDark
+                ? 'border-blue-400 bg-slate-800/80 text-slate-300 hover:bg-slate-800'
+                : 'border-blue-500 bg-blue-50/70 text-slate-700 hover:bg-blue-100/70'
+            }`}
+            title="Click to jump to original message"
+          >
+            <Reply className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+            <span className="text-blue-400 font-semibold text-[11px]">
+              {messages.find((m: Message) => m.id === repliedMessage.id)?.senderId === currentUser.id ? 'You' : 'Replying to'}:
+            </span>
+            <span className="italic truncate text-[11.5px] opacity-90">{repliedMessage.content || '[Attachment]'}</span>
+          </button>
         )}
 
         {/* Message Body or Edit Mode */}
@@ -358,16 +512,22 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
             <span>This message was deleted</span>
           </div>
-        ) : (
-          <div className={`break-words px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed shadow-xs max-w-full ${
-            isOwnMessage
-              ? isDark
-                ? 'bg-[#1E2738] border border-[#2E3C54] text-slate-100 rounded-tr-xs'
-                : 'bg-[#EFF6FF] border border-[#BFDBFE] text-slate-900 rounded-tr-xs'
-              : isDark
-              ? 'bg-[#141B28] border border-[#1E293B] text-[#E2E8F0] rounded-tl-xs'
-              : 'bg-white border border-[#CBD5E1] text-[#1E293B] rounded-tl-xs'
-          }`}>
+        ) : hasText ? (
+          <div
+            className={`break-words px-4 py-2.5 rounded-2xl text-[13.5px] leading-relaxed shadow-xs max-w-full ${
+              isOwnMessage
+                ? isDark
+                  ? 'bg-[#1E2738] border border-[#2E3C54] text-slate-100 rounded-tr-xs border-r-2'
+                  : 'bg-[#EFF6FF] border border-[#BFDBFE] text-slate-900 rounded-tr-xs border-r-2'
+                : isDark
+                ? 'bg-[#141B28] border border-[#1E293B] text-[#E2E8F0] rounded-tl-xs'
+                : 'bg-white border border-[#CBD5E1] text-[#1E293B] rounded-tl-xs'
+            }`}
+            style={isOwnMessage
+              ? { borderRightColor: senderColor, borderRightWidth: '3px' }
+              : { borderLeftColor: senderColor, borderLeftWidth: '3px', borderRadius: '0 1rem 1rem 1rem' }
+            }
+          >
             <MessageBubble
               content={message.content}
               format={message.format}
@@ -375,56 +535,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             />
 
             {/* Executive Status & Timestamp Bar */}
-            <div className={`flex items-center gap-1.5 mt-1 text-[10px] font-mono select-none ${
-              isOwnMessage ? 'justify-end text-slate-400/90' : 'justify-end text-slate-400/90'
-            }`}>
-              {message.editedAt && (
-                <span className="italic text-[9px] text-slate-400/75">(edited)</span>
-              )}
-
-              {message.status === 'failed' ? (
-                <span className="inline-flex items-center gap-1.5 text-rose-400 font-mono text-[10px]">
-                  <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
-                  <span>Failed to send</span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      retrySendMessage(message.id);
-                    }}
-                    className="ml-1 px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold cursor-pointer underline transition-colors"
-                    title={message.sendError || "Retry sending"}
-                  >
-                    Retry
-                  </button>
-                </span>
-              ) : message.status === 'sending' ? (
-                <span className="inline-flex items-center gap-1 text-slate-400/80 font-mono text-[10px] italic">
-                  <span className="w-2 h-2 rounded-full border border-slate-400 border-t-transparent animate-spin inline-block" />
-                  <span>Sending...</span>
-                </span>
-              ) : isOwnMessage && message.conversationId?.startsWith('dm-') ? (
-                message.readAt ? (
-                  <span className="inline-flex items-center gap-1 text-slate-400 font-mono" title={`Sent: ${timeStr} • Seen: ${new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}>
-                    <span>Sent {timeStr}</span>
-                    <span className="opacity-60">•</span>
-                    <span className="text-blue-400 font-medium">Seen {new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span className="text-blue-400 font-bold tracking-[-2px] ml-0.5">✓✓</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-slate-400 font-mono" title={`Sent: ${timeStr} • Delivered`}>
-                    <span>Sent {timeStr}</span>
-                    <span className="opacity-60">•</span>
-                    <span className="text-slate-400">Delivered</span>
-                    <span className="text-slate-400 font-bold ml-0.5">✓</span>
-                  </span>
-                )
-              ) : (
-                <span>{timeStr}</span>
-              )}
+            <div className="mt-1">
+              {renderStatus()}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Rich Attachment Card from Picture 3 */}
         {message.metadata?.cardType === 'attachment' && (
@@ -515,42 +630,42 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         {/* Rich Media & Attachments */}
         {message.attachments && message.attachments.length > 0 && (
-          <div className="mt-2.5 flex flex-col items-start gap-2.5">
+          <div className={`mt-2 flex flex-col gap-2 ${isOwnMessage ? 'items-end' : 'items-start'}`}>
             {message.attachments.map(att => {
               if (isImageAttachment(att)) {
                 return (
                   <div
                     key={att.id}
-                    className={`relative group w-fit max-w-full rounded-xl overflow-hidden border transition shadow-sm ${
+                    className={`relative group w-fit max-w-[320px] sm:max-w-[360px] rounded-xl overflow-hidden border transition shadow-sm ${
                       isDark
                         ? 'border-slate-700/60 bg-slate-900/30 hover:border-blue-500/50'
                         : 'border-slate-200 bg-slate-100/50 hover:border-blue-400'
                     }`}
                   >
                     <img
-                      src={att.url}
+                      src={resolveMediaUrl(att.url)}
                       alt={att.name}
                       loading="lazy"
-                      onClick={() => setLightboxImage({ url: att.url, name: att.name })}
-                      className="block max-h-[320px] sm:max-h-[380px] w-auto max-w-full object-contain cursor-zoom-in transition-transform duration-200 group-hover:scale-[1.01]"
+                      onClick={() => setLightboxImage({ url: resolveMediaUrl(att.url), name: att.name })}
+                      className="block max-h-[200px] sm:max-h-[230px] w-auto max-w-[320px] sm:max-w-[360px] object-contain cursor-zoom-in transition-transform duration-200 group-hover:scale-[1.01]"
                     />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2.5 flex items-end justify-between gap-2 transition-opacity opacity-100 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
-                      <span className="text-white text-xs font-mono truncate max-w-[200px]" title={att.name}>
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 flex items-end justify-between gap-2 transition-opacity opacity-100 sm:opacity-0 sm:group-hover:opacity-100 pointer-events-none">
+                      <span className="text-white text-[11px] font-mono truncate max-w-[180px]" title={att.name}>
                         {att.name} ({formatBytes(att.size)})
                       </span>
-                      <div className="flex items-center gap-1.5 pointer-events-auto flex-shrink-0">
+                      <div className="flex items-center gap-1 pointer-events-auto flex-shrink-0">
                         <button
                           type="button"
-                          onClick={() => setLightboxImage({ url: att.url, name: att.name })}
-                          className="p-1.5 rounded-md bg-black/70 hover:bg-black text-white transition cursor-pointer"
+                          onClick={() => setLightboxImage({ url: resolveMediaUrl(att.url), name: att.name })}
+                          className="p-1 rounded-md bg-black/70 hover:bg-black text-white transition cursor-pointer"
                           title="Enlarge preview"
                         >
                           <Maximize2 className="w-3.5 h-3.5" />
                         </button>
                         <a
-                          href={att.downloadUrl || att.url}
+                          href={resolveMediaUrl(att.downloadUrl || att.url)}
                           download={att.name}
-                          className="p-1.5 rounded-md bg-black/70 hover:bg-black text-white transition cursor-pointer"
+                          className="p-1 rounded-md bg-black/70 hover:bg-black text-white transition cursor-pointer"
                           title="Download file"
                         >
                           <Download className="w-3.5 h-3.5" />
@@ -565,7 +680,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 return (
                   <div
                     key={att.id}
-                    className={`w-fit max-w-full sm:max-w-lg rounded-xl overflow-hidden border shadow-sm flex flex-col ${
+                    className={`w-fit max-w-[320px] sm:max-w-[360px] rounded-xl overflow-hidden border shadow-sm flex flex-col ${
                       isDark
                         ? 'border-slate-700/60 bg-black'
                         : 'border-slate-200 bg-black'
@@ -575,22 +690,22 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                       controls
                       preload="metadata"
                       playsInline
-                      className="block max-h-[360px] max-w-full w-auto object-contain bg-black"
+                      className="block max-h-[200px] sm:max-h-[230px] max-w-[320px] sm:max-w-[360px] w-auto object-contain bg-black"
                     >
-                      <source src={att.url} type={att.type || 'video/mp4'} />
+                      <source src={resolveMediaUrl(att.url)} type={att.type || 'video/mp4'} />
                       Your browser does not support HTML5 video streaming.
                     </video>
-                    <div className={`flex items-center justify-between gap-3 px-3 py-2 text-xs border-t ${
+                    <div className={`flex items-center justify-between gap-3 px-3 py-1.5 text-xs border-t ${
                       isDark ? 'bg-[#0F172A] border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                     }`}>
                       <div className="flex items-center gap-2 min-w-0">
-                        <Film className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                        <span className="truncate font-mono font-medium max-w-[220px]" title={att.name}>{att.name}</span>
+                        <Film className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                        <span className="truncate font-mono text-[11px] font-medium max-w-[170px]" title={att.name}>{att.name}</span>
                       </div>
                       <a
-                        href={att.downloadUrl || att.url}
+                        href={resolveMediaUrl(att.downloadUrl || att.url)}
                         download={att.name}
-                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-400 font-mono transition ml-2 flex-shrink-0"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-400 font-mono text-[11px] transition ml-2 flex-shrink-0"
                         title="Download video"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -605,7 +720,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 return (
                   <div
                     key={att.id}
-                    className={`w-full max-w-sm rounded-xl p-3 border shadow-xs flex flex-col gap-1.5 ${
+                    className={`w-full max-w-[320px] sm:max-w-[360px] rounded-xl p-2.5 border shadow-xs flex flex-col gap-1.5 ${
                       isDark ? 'bg-[#162032] border-slate-700/50' : 'bg-slate-50 border-slate-200'
                     }`}
                   >
@@ -614,7 +729,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                       <span className="text-xs font-mono font-medium truncate">{att.name}</span>
                       <span className="text-[10px] text-slate-400 font-mono ml-auto">{formatBytes(att.size)}</span>
                     </div>
-                    <audio controls src={att.url} className="w-full h-8 mt-1" />
+                    <audio controls src={resolveMediaUrl(att.url)} className="w-full h-8 mt-1" />
                   </div>
                 );
               }
@@ -622,38 +737,52 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               return (
                 <div
                   key={att.id}
-                  className={`flex items-center gap-3 p-2.5 rounded-lg border transition shadow-xs w-fit max-w-sm ${
+                  className={`flex items-center gap-3 p-2.5 rounded-lg border transition shadow-xs w-fit max-w-[320px] sm:max-w-[360px] ${
                     isDark
                       ? 'bg-[#182030] border-[#2E3C52] hover:bg-[#1E293B] text-slate-200'
                       : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800'
                   }`}
                 >
-                  <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
-                    <FileText className="w-5 h-5" />
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
+                    <FileText className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-xs truncate max-w-[200px]" title={att.name}>{att.name}</p>
+                    <p className="font-semibold text-xs truncate max-w-[180px]" title={att.name}>{att.name}</p>
                     <p className="text-[10px] text-slate-400 font-mono mt-0.5">{formatBytes(att.size)}</p>
                   </div>
                   <a
-                    href={att.downloadUrl || att.url}
+                    href={resolveMediaUrl(att.downloadUrl || att.url)}
                     download={att.name}
                     className={`p-1.5 rounded-md transition flex-shrink-0 ${
                       isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                     }`}
                     title="Download file"
                   >
-                    <Download className="w-4 h-4 text-blue-400" />
+                    <Download className="w-3.5 h-3.5 text-blue-400" />
                   </a>
                 </div>
               );
             })}
+
+            {/* If there was no text bubble, show the timestamp / status directly under the attachments */}
+            {!hasText && (
+              <div className="mt-0.5 px-0.5">
+                {renderStatus()}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* If no text and no attachments, render status here (e.g. metadata cards or empty) */}
+        {!hasText && (!message.attachments || message.attachments.length === 0) && (
+          <div className="mt-0.5 px-0.5">
+            {renderStatus()}
           </div>
         )}
 
         {/* Reactions Section */}
         {message.reactions && Object.keys(message.reactions).length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+          <div className={`mt-1 flex flex-wrap gap-1.5 items-center w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
             {Object.entries(message.reactions).map(([emoji, userIdsRaw]) => {
               const userIds = (Array.isArray(userIdsRaw) ? userIdsRaw : []) as (string | number)[];
               const currentNum = Number(String(currentUser.id || '').replace(/^usr_/, ''));
@@ -672,7 +801,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   onClick={() => toggleReaction(message.id, emoji)}
                   className={`h-6 px-2 rounded-[4px] text-xs font-mono inline-flex items-center gap-1.5 transition-all ${
                     hasReacted
-                      ? 'bg-blue-50 border border-blue-400 text-blue-700 font-medium shadow-xs'
+                      ? isDark
+                        ? 'bg-blue-950/70 border border-blue-500/60 text-blue-300 font-medium shadow-xs'
+                        : 'bg-blue-50 border border-blue-400 text-blue-700 font-medium shadow-xs'
+                      : isDark
+                      ? 'bg-[#151D2C] border border-[#273549] text-slate-300 hover:bg-[#1E293B] hover:text-white'
                       : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
                   }`}
                   title={`${userIds.length} reaction${userIds.length > 1 ? 's' : ''}`}
@@ -686,7 +819,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             {/* Quick Add Reaction Button */}
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="h-6 w-6 rounded-[4px] flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              className={`h-6 w-6 rounded-[4px] flex items-center justify-center transition-colors ${
+                isDark
+                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+              }`}
               title="Add reaction"
             >
               <Smile className="w-3.5 h-3.5" />
@@ -696,7 +833,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
         {/* Inline Emoji Quick Picker */}
         {showEmojiPicker && (
-          <div className="mt-1.5 flex items-center gap-1 p-1 rounded-[6px] bg-white border border-slate-200 shadow-[0_6px_18px_rgba(0,0,0,0.12)] w-max animate-in fade-in duration-100 z-10">
+          <div className={`mt-1.5 flex items-center gap-1 p-1 rounded-[6px] border shadow-lg w-max animate-in fade-in duration-100 z-10 ${
+            isDark
+              ? 'bg-[#151D2C] border-[#273549] text-slate-200 shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+              : 'bg-white border-slate-200 text-slate-700 shadow-[0_6px_18px_rgba(0,0,0,0.12)]'
+          }`}>
             {COMMON_EMOJIS.map(emoji => (
               <button
                 key={emoji}
@@ -711,76 +852,97 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Floating Action Menu (Appears on Hover, hidden if message is deleted) */}
-      {!isDeleted && (
-        <div className={`absolute ${isOwnMessage ? 'left-2 sm:left-4' : 'right-2 sm:right-4'} -top-3 max-w-[calc(100%-1rem)] overflow-x-auto hidden group-hover:flex items-center gap-0.5 p-0.5 sm:p-1 rounded-md border z-10 shadow-md ${
-          isDark ? 'bg-[#182030] border-[#263348] text-slate-300' : 'bg-[#EAEFF5] border-[#C6D0DC] text-slate-700 shadow-xs'
-        }`}>
-          <button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className={`p-1.5 rounded text-xs transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-600 hover:text-slate-900 hover:bg-[#DEE5EE]'}`}
-            title="React"
-          >
-            <Smile className="w-3.5 h-3.5" />
-          </button>
-
-          {showThreadButton && onOpenThread && (
+        {/* Floating Action Menu — fixed intrinsic width, no underflow clipping */}
+        {!isDeleted && (
+          <div className={`absolute ${isOwnMessage ? '-top-3.5 right-0' : '-top-3.5 left-0'} w-max overflow-visible hidden group-hover/row:flex items-center gap-0.5 p-0.5 sm:p-1 rounded-lg border z-30 shadow-lg ${
+            isDark ? 'bg-[#182030] border-[#263348] text-slate-300' : 'bg-[#EAEFF5] border-[#C6D0DC] text-slate-700 shadow-md'
+          }`}>
             <button
-              onClick={onOpenThread}
-              className={`p-1.5 rounded text-xs transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
-              title="Reply in thread"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`p-1.5 rounded text-xs transition cursor-pointer ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-600 hover:text-slate-900 hover:bg-[#DEE5EE]'}`}
+              title="React"
+            >
+              <Smile className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => setReplyingToMessage(message)}
+              className={`p-1.5 rounded text-xs transition cursor-pointer ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-600 hover:text-slate-900 hover:bg-[#DEE5EE]'}`}
+              title="Reply to message"
             >
               <Reply className="w-3.5 h-3.5" />
             </button>
-          )}
 
+            <button
+              onClick={() => togglePinMessage(message.id)}
+              className={`p-1.5 rounded text-xs transition cursor-pointer ${
+                message.isPinned
+                  ? 'text-amber-400 bg-amber-500/20'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title={message.isPinned ? 'Unpin message' : 'Pin message'}
+            >
+              <Pin className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={handleCopy}
+              className={`p-1.5 rounded text-xs transition cursor-pointer ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              title="Copy text"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+
+            {canEdit && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className={`p-1.5 rounded text-xs transition cursor-pointer ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+                title="Edit message"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                onClick={handleDelete}
+                className={`p-1.5 rounded text-xs transition cursor-pointer ${isDark ? 'text-rose-400 hover:bg-rose-500/20' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'}`}
+                title="Delete message"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* WhatsApp-style side hover buttons for incoming messages: placed to the RIGHT of the bubble */}
+      {!isOwnMessage && !isDeleted && (
+        <div className="self-center hidden sm:flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1.5 flex-shrink-0">
           <button
-            onClick={() => togglePinMessage(message.id)}
-            className={`p-1.5 rounded text-xs transition ${
-              message.isPinned
-                ? 'text-amber-400 bg-amber-500/20'
-                : isDark
-                ? 'text-slate-400 hover:text-white hover:bg-slate-700/60'
-                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+              isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200'
             }`}
-            title={message.isPinned ? 'Unpin message' : 'Pin message'}
+            title="React"
           >
-            <Pin className="w-3.5 h-3.5" />
+            <Smile className="w-4 h-4" />
           </button>
-
           <button
-            onClick={handleCopy}
-            className={`p-1.5 rounded text-xs transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
-            title="Copy text"
+            type="button"
+            onClick={() => setReplyingToMessage(message)}
+            className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+              isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200'
+            }`}
+            title="Reply"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <Reply className="w-4 h-4" />
           </button>
-
-          {canEdit && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className={`p-1.5 rounded text-xs transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
-              title="Edit message"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {canDelete && (
-            <button
-              onClick={handleDelete}
-              className={`p-1.5 rounded text-xs transition ${isDark ? 'text-rose-400 hover:bg-rose-500/20' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'}`}
-              title="Delete message"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       )}
-
-      {/* Media Lightbox Modal */}
       {lightboxImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150"

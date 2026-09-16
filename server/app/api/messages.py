@@ -177,27 +177,23 @@ def get_messages(
 ):
     query = db.query(Message)
 
-    # 1. Base RBAC Scoping:
-    # 1:1 Direct Messages are STRICTLY private between the sender and receiver.
-    # Main-Admin has NO backdoor access to retrieve other employees' private DMs.
-    dm_access_clause = and_(
-        Message.receiver_id.isnot(None),
-        or_(
-            Message.sender_id == current_user.id,
-            Message.receiver_id == current_user.id
-        )
-    )
-
-    allowed_clauses = [
-        Message.format.in_(["channel:announcements", "channel:updates"]),
-        dm_access_clause
-    ]
-
+    # 1. RBAC Scoping:
+    # Main-Admin retains global archive access to team channels and announcements,
+    # but has ZERO BACKDOOR to 1:1 direct messages between other users.
     if current_user.is_main_admin:
-        # Main-Admin retains global oversight across all team channels
-        allowed_clauses.append(Message.team.isnot(None))
+        admin_allowed_clauses = [
+            Message.format.in_(["channel:announcements", "channel:updates"]),
+            Message.team.isnot(None),
+            and_(
+                Message.receiver_id.isnot(None),
+                or_(
+                    Message.sender_id == current_user.id,
+                    Message.receiver_id == current_user.id
+                )
+            )
+        ]
+        query = query.filter(or_(*admin_allowed_clauses))
     else:
-        # Non-admin users are restricted to team channels where they are an active member
         active_memberships = db.query(TeamMembership).filter(
             TeamMembership.user_id == current_user.id,
             TeamMembership.left_at.is_(None)
@@ -205,10 +201,21 @@ def get_messages(
         user_active_teams = set(m.team for m in active_memberships)
         if current_user.team:
             user_active_teams.add(current_user.team)
+
+        allowed_clauses = [
+            Message.format.in_(["channel:announcements", "channel:updates"]),
+            and_(
+                Message.receiver_id.isnot(None),
+                or_(
+                    Message.sender_id == current_user.id,
+                    Message.receiver_id == current_user.id
+                )
+            )
+        ]
         if user_active_teams:
             allowed_clauses.append(Message.team.in_(list(user_active_teams)))
 
-    query = query.filter(or_(*allowed_clauses))
+        query = query.filter(or_(*allowed_clauses))
 
     # 2. Query filters
     if format:
@@ -345,12 +352,16 @@ def search_workspace(
             user_teams.append(current_user.team)
 
     # Base permission condition:
+    # Zero-backdoor rule: direct messages MUST only be accessible if current_user is sender or receiver.
     perm_clauses = [
         Message.format.in_(["channel:announcements", "channel:updates"]),
-        or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
+        and_(
+            Message.receiver_id.isnot(None),
+            or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
+        )
     ]
     if user_teams:
-        perm_clauses.append(Message.team.in_(user_teams))
+        perm_clauses.append(and_(Message.team.in_(user_teams), Message.receiver_id.is_(None)))
 
     # 1. Query Messages matching content
     msg_query = db.query(Message).filter(
@@ -530,11 +541,17 @@ async def delete_message(
     if msg.deleted_at is not None:
         return {"message": "Message already deleted"}
 
-    is_owner = (msg.sender_id == current_user.id)
-    is_admin = current_user.is_main_admin
-
-    if not is_owner and not is_admin:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this message")
+    if msg.receiver_id is not None:
+        # Zero backdoor on private DMs: only message owner can delete their own DM message
+        if msg.sender_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only delete your own direct messages")
+        is_owner = True
+        is_admin = False
+    else:
+        is_owner = (msg.sender_id == current_user.id)
+        is_admin = current_user.is_main_admin
+        if not is_owner and not is_admin:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this message")
 
     msg.deleted_at = datetime.utcnow()
     msg.deleted_by_admin = (not is_owner and is_admin)
@@ -581,6 +598,12 @@ async def toggle_reaction(
     emoji = react_in.emoji.strip()
     if not emoji:
         raise HTTPException(status_code=400, detail="Emoji cannot be empty")
+
+    # Zero backdoor and IDOR protection: user must have authorization to access this message
+    if not check_message_read_access(msg, current_user, db):
+        if msg.receiver_id is not None:
+            raise HTTPException(status_code=403, detail="Not authorized to react to this direct message")
+        raise HTTPException(status_code=404, detail="Message not found")
 
     existing = db.query(MessageReaction).filter(
         MessageReaction.message_id == message_id,
@@ -676,9 +699,12 @@ def get_message_thread(
     if not parent or parent.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # IDOR Protection: Verify caller has authorization to view this message & thread
+    # IDOR Protection & Zero-Backdoor privacy enforcement: conceal private threads with 404
     if not check_message_read_access(parent, current_user, db):
-        raise HTTPException(status_code=404, detail="Message not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found"
+        )
 
     replies = db.query(Message).filter(
         Message.reply_to_id == message_id,
@@ -704,7 +730,6 @@ def get_pinned_messages(
             team_enum = TeamEnum(team_val)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid team")
-        
         # Verify team access for non-admins
         if not current_user.is_main_admin:
             memberships = db.query(TeamMembership).filter(
@@ -713,7 +738,6 @@ def get_pinned_messages(
             ).all()
             if not memberships and current_user.team != team_enum:
                 raise HTTPException(status_code=403, detail="You are not a member of this team")
-
         msgs = db.query(Message).filter(
             Message.team == team_enum,
             Message.is_pinned == True,
@@ -732,3 +756,6 @@ def get_pinned_messages(
         raise HTTPException(status_code=400, detail="Must specify team or recipient_id")
 
     return [format_message_out(m, db) for m in msgs]
+
+
+
