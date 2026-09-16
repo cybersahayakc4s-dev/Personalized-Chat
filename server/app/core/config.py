@@ -83,10 +83,15 @@ class Settings(BaseSettings):
         if not self.DATABASE_URL or not self.DATABASE_URL.strip():
             errors.append("DATABASE_URL: database connection URL must be specified and non-empty.")
 
-        # In production, disallow pure localhost CORS
+        # In production, disallow pure localhost CORS and wildcard origins
         if self.ENVIRONMENT.lower() == "production":
             origins = self.cors_origins
-            web_origins = [o for o in origins if o not in ["file://", "null"]]
+            raw_configured = [o.strip() for o in (self.ALLOWED_ORIGINS or "").split(",") if o.strip()]
+            if any(o == "*" for o in raw_configured):
+                errors.append(
+                    "ALLOWED_ORIGINS: Wildcard origin '*' is strictly prohibited in production when credentials are enabled."
+                )
+            web_origins = [o for o in origins if o not in ["file://", "null", "*"]]
             if not web_origins or all("localhost" in o or "127.0.0.1" in o for o in web_origins):
                 errors.append(
                     "ALLOWED_ORIGINS: ENVIRONMENT=production requires explicit production domains in ALLOWED_ORIGINS "

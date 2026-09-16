@@ -164,65 +164,6 @@ def format_message_out(msg: Message, db: Optional[Session] = None) -> MessageOut
         attachments=formatted_attachments
     )
 
-
-def format_message_out(msg: Message, db: Optional[Session] = None) -> MessageOut:
-    reply_to_data = None
-    if msg.reply_to_id and msg.reply_to_message:
-        orig = msg.reply_to_message
-        orig_sender = orig.sender.name if orig.sender else "User"
-        orig_content = "This message was deleted" if orig.deleted_at else orig.content
-        reply_to_data = {
-            "id": orig.id,
-            "sender_name": orig_sender,
-            "team": orig.team.value if orig.team else None,
-            "content": orig_content
-        }
-
-    # Group reactions by emoji
-    reactions_dict: dict[str, list[int]] = {}
-    if hasattr(msg, "reactions") and msg.reactions:
-        for r in msg.reactions:
-            reactions_dict.setdefault(r.emoji, []).append(r.user_id)
-
-    # Thread count
-    thread_count = 0
-    if db is not None:
-        thread_count = db.query(Message).filter(Message.reply_to_id == msg.id, Message.deleted_at.is_(None)).count()
-
-    formatted_attachments = []
-    if hasattr(msg, "attachments") and msg.attachments:
-        for a in msg.attachments:
-            formatted_attachments.append(AttachmentOut(
-                id=a.id,
-                message_id=a.message_id,
-                file_name=a.file_name,
-                file_size_bytes=a.file_size_bytes,
-                mime_type=a.mime_type or "application/octet-stream",
-                url=f"/api/attachments/{a.id}/view",
-                download_url=f"/api/attachments/{a.id}/download"
-            ))
-
-    return MessageOut(
-        id=msg.id,
-        sender_id=msg.sender_id,
-        sender_name=msg.sender.name if msg.sender else "Unknown",
-        receiver_id=msg.receiver_id,
-        team=msg.team,
-        content=msg.content,
-        reply_to_id=msg.reply_to_id,
-        reply_to=reply_to_data,
-        created_at=msg.created_at,
-        edited_at=msg.edited_at,
-        deleted_at=msg.deleted_at,
-        deleted_by_admin=msg.deleted_by_admin,
-        read_at=msg.read_at,
-        is_pinned=bool(getattr(msg, "is_pinned", False)),
-        format=getattr(msg, "format", "plain") or "plain",
-        reactions=reactions_dict,
-        thread_count=thread_count,
-        attachments=formatted_attachments
-    )
-
 @router.get("", response_model=List[MessageOut])
 def get_messages(
     format: Optional[str] = None,
@@ -658,9 +599,11 @@ async def toggle_reaction(
     if not emoji:
         raise HTTPException(status_code=400, detail="Emoji cannot be empty")
 
-    # Zero backdoor: prevent reacting to other people's private DMs
-    if msg.receiver_id is not None and current_user.id not in [msg.sender_id, msg.receiver_id]:
-        raise HTTPException(status_code=403, detail="Not authorized to react to this direct message")
+    # Zero backdoor and IDOR protection: user must have authorization to access this message
+    if not check_message_read_access(msg, current_user, db):
+        if msg.receiver_id is not None:
+            raise HTTPException(status_code=403, detail="Not authorized to react to this direct message")
+        raise HTTPException(status_code=404, detail="Message not found")
 
     existing = db.query(MessageReaction).filter(
         MessageReaction.message_id == message_id,

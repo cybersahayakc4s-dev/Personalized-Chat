@@ -1922,3 +1922,93 @@ def test_zero_backdoor_audit_log_content_check():
         details_text = log.details or ""
         assert unique_audit_marker not in details_text
     db.close()
+
+
+# ==============================================================================
+# REMEDIATION TESTS: I-1 (Reaction IDOR) & C-1 (Production Wildcard CORS)
+# ==============================================================================
+
+def test_cross_team_reaction_does_not_leak_message():
+    """Remediation I-1: Prevent cross-team message reading via reaction IDOR."""
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    x_token = get_token("user.x@company.internal", "Password@123")  # team_ai member
+    x_headers = {"Authorization": f"Bearer {x_token}"}
+    y_token = get_token("user.y@company.internal", "Password@123")  # team_ai member
+    y_headers = {"Authorization": f"Bearer {y_token}"}
+    z_token = get_token("user.z@company.internal", "Password@123")  # team_legal member
+    z_headers = {"Authorization": f"Bearer {z_token}"}
+
+    # 1. User X in team_ai posts confidential message with attachment
+    secret_text = "AI_CONFIDENTIAL_AUDIT_REPORT_XYZ_987"
+    att_payload = {"file": ("privilege.pdf", b"%PDF-1.4 confidential ai data", "application/pdf")}
+    upload_res = client.post(
+        "/api/attachments/upload",
+        headers=x_headers,
+        files=att_payload,
+        data={"team": "team_ai", "content": secret_text}
+    )
+    assert upload_res.status_code == 200
+    team_msg_id = upload_res.json()["id"]
+
+    # 2. User Z in team_legal attempts to react to User X's team_ai message
+    unauth_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=z_headers,
+        json={"emoji": "👀"}
+    )
+    # Must be denied (404 Not Found prevents using endpoint as IDOR oracle)
+    assert unauth_react.status_code in [403, 404]
+    # Crucial security assertion: response body must not leak message content or attachment info
+    assert secret_text not in unauth_react.text
+    assert "privilege.pdf" not in unauth_react.text
+
+    # 3. Legitimate authorized user in team_ai (User Y) can react successfully
+    auth_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=y_headers,
+        json={"emoji": "👍"}
+    )
+    assert auth_react.status_code == 200
+    y_id = client.get("/api/auth/me", headers=y_headers).json()["id"]
+    assert auth_react.json()["reactions"]["👍"] == [y_id]
+
+    # 4. Main-Admin (company oversight) can react under existing team policy
+    admin_react = client.post(
+        f"/api/messages/{team_msg_id}/reactions",
+        headers=admin_headers,
+        json={"emoji": "✅"}
+    )
+    assert admin_react.status_code == 200
+
+
+def test_startup_validation_production_wildcard_cors_rejection():
+    """Remediation C-1: Verify startup validation rejects wildcard ALLOWED_ORIGINS='*' in production."""
+    from app.core.config import Settings
+    with pytest.raises(Exception) as exc_info:
+        Settings(
+            SECRET_KEY="012345678901234567890123456789012",
+            DATABASE_URL="sqlite:///test.db",
+            INITIAL_ADMIN_EMAIL="admin@company.internal",
+            INITIAL_ADMIN_PASSWORD="Admin@123456",
+            ENVIRONMENT="production",
+            ALLOWED_ORIGINS="*"
+        )
+    err_str = str(exc_info.value)
+    assert "Wildcard origin '*' is strictly prohibited in production" in err_str
+
+
+def test_startup_validation_production_explicit_origin_acceptance():
+    """Remediation C-1: Verify startup validation accepts legitimate explicit production origin with file/null."""
+    from app.core.config import Settings
+    s = Settings(
+        SECRET_KEY="012345678901234567890123456789012",
+        DATABASE_URL="sqlite:///test.db",
+        INITIAL_ADMIN_EMAIL="admin@company.internal",
+        INITIAL_ADMIN_PASSWORD="Admin@123456",
+        ENVIRONMENT="production",
+        ALLOWED_ORIGINS="https://chat.company.internal"
+    )
+    assert "https://chat.company.internal" in s.cors_origins
+    assert "file://" in s.cors_origins
+    assert "null" in s.cors_origins
