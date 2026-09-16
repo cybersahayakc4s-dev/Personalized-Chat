@@ -166,7 +166,7 @@ jobs:
                 echo "WARNING: Database backup failed or database container empty. Proceeding cautiously."
               }
             fi
-            tar -xzf "$APP_DIR/personalize_chat_deploy.tar.gz" -C "$APP_DIR"
+            tar -xzf "$APP_DIR/tmp/personalize_chat_deploy.tar.gz" -C "$APP_DIR"
 
             echo "=== [4/8] Building new images and running database migrations BEFORE service restart ==="
             docker compose -f "$COMPOSE_FILE" build server client
