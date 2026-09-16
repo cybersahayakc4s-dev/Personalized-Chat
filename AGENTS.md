@@ -96,6 +96,38 @@ docker compose up -d --build
 - `README.md` — Operational guide (features, quick start, deployment)
 - `master-plan (1).md` — Original full spec (roles, data model, API surface)
 - `design-brief.md` — Restyling pass (fonts, colors, design tokens)
+- `vpssession.md` — Full VPS deployment session record (SSH details, CI/CD, credentials, rollback)
+
+## Deployment & Operations
+
+### Production Environment
+- **VPS**: `teamai@187.127.148.60` (Ubuntu 24.04.4, Docker 29.7.2)
+- **App dir**: `/opt/company/apps/personalize-chat/`
+- **Public URL**: `https://chat.cybersahayak.cloud`
+- **Cloudflare**: Full (Strict) mode, Origin CA cert (valid 2041)
+
+### CI/CD Pipeline
+- **Trigger**: push to `main`
+- **Test job**: pytest (41 tests), frontend build, migration safety scan
+- **Deploy job**: packages `server/ client/ docker-compose.prod.yml` → scp to VPS → SSH script extracts, builds, migrates, restarts
+- **Rollback**: automatic from `backups/code_<SHA>.tar.gz` on health-check failure
+- **Secrets**: `VPS_HOST`, `VPS_USER`, `SSH_KEY` (repo-level GitHub secrets)
+
+### Key Deployment Rules
+- Never `docker compose down` globally — only `up -d server client` scoped to Personalize Chat
+- Never touch sibling containers (CRM, AI-HR, Platform, company-nginx, company-postgres, company-redis)
+- Graceful nginx reload only: `docker exec company-nginx nginx -s reload`
+- `.env` on VPS must quote `INITIAL_ADMIN_NAME="Main Admin"` (space in value)
+
+### SSH Access (from Windows dev machine)
+```powershell
+ssh -i "C:\Users\kunal\.ssh\deploy_key" -o IdentitiesOnly=yes -o BatchMode=yes teamai@187.127.148.60
+```
+Key: `C:\Users\kunal\.ssh\deploy_key` (passphrase-free, never display/copy/commit)
+
+### Admin Credentials
+- **Email**: `admin@company.internal`
+- **Password**: `WzBBOaN8RXYZHnL5wlRpiEr9` (rotate after testing)
 OpenCode UI Agent Instructions
 
 You are an expert Frontend Architect and UI/UX Designer. Your goal is to generate clean, highly responsive, beautiful, and accessible web interfaces.
