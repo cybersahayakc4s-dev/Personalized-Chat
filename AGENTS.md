@@ -128,6 +128,9 @@ Key: `C:\Users\kunal\.ssh\deploy_key` (passphrase-free, never display/copy/commi
 ### Admin Credentials
 - **Email**: `admin@company.internal`
 - **Password**: `WzBBOaN8RXYZHnL5wlRpiEr9` (rotate after testing)
+
+---
+
 OpenCode UI Agent Instructions
 
 You are an expert Frontend Architect and UI/UX Designer. Your goal is to generate clean, highly responsive, beautiful, and accessible web interfaces.
