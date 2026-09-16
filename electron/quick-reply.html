@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Reply</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: transparent;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      padding: 6px;
+    }
+
+    .card {
+      width: 100%;
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Light Theme (Default) */
+    .card.light {
+      background: rgba(255, 255, 255, 0.98);
+      border-color: #e2e8f0;
+      color: #0f172a;
+    }
+    .card.light .header-preview { color: #64748b; }
+    .card.light .divider { background: #e2e8f0; }
+    .card.light .chip {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+    }
+    .card.light .input-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #0f172a;
+    }
+    .card.light .input-box::placeholder { color: #94a3b8; }
+    .card.light .close-btn { color: #64748b; }
+    .card.light .close-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+    /* Dark Theme */
+    .card.dark {
+      background: rgba(21, 29, 42, 0.98);
+      border-color: #2a3852;
+      color: #f8fafc;
+    }
+    .card.dark .header-preview { color: #94a3b8; }
+    .card.dark .divider { background: #2a3852; }
+    .card.dark .chip {
+      background: #1c2638;
+      border: 1px solid #2e3c54;
+      color: #cbd5e1;
+    }
+    .card.dark .input-box {
+      background: #0e1420;
+      border: 1px solid #2a3852;
+      color: #ffffff;
+    }
+    .card.dark .input-box::placeholder { color: #64748b; }
+    .card.dark .close-btn { color: #94a3b8; }
+    .card.dark .close-btn:hover { background: #1e293b; color: #ffffff; }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .sender-info {
+      min-width: 0;
+      flex: 1;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sender-name {
+      font-weight: 600;
+      font-size: 12.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(37, 99, 235, 0.15);
+      color: #3b82f6;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .header-preview {
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+    .close-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+    }
+
+    .divider {
+      height: 1px;
+      width: 100%;
+      margin: 9px 0 8px 0;
+    }
+
+    /* Chips */
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+    .chip {
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 4px 9px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .chip:hover {
+      background: #2563eb !important;
+      color: #ffffff !important;
+      border-color: #2563eb !important;
+      transform: translateY(-1px);
+    }
+
+    /* Form */
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .input-box {
+      flex: 1;
+      height: 32px;
+      border-radius: 10px;
+      padding: 0 10px;
+      font-size: 11.5px;
+      outline: none;
+      user-select: text;
+      transition: border-color 0.15s ease;
+    }
+    .input-box:focus {
+      border-color: #3b82f6;
+    }
+    .send-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: #2563eb;
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      flex-shrink: 0;
+    }
+    .send-btn:hover {
+      background: #1d4ed8;
+    }
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div id="card" class="card dark">
+    <!-- Header -->
+    <div class="header" id="headerClickArea" title="Click to open full chat">
+      <div class="header-left">
+        <div class="avatar" id="avatarLetter">R</div>
+        <div class="sender-info">
+          <div class="title-row">
+            <span class="sender-name" id="senderName">Raj</span>
+            <span class="badge">Quick Reply</span>
+          </div>
+          <div class="header-preview" id="messagePreview">"hi"</div>
+        </div>
+      </div>
+      <button class="close-btn" id="closeBtn" title="Dismiss">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Chips -->
+    <div class="chips-row">
+      <button class="chip" data-text="Okay">👍 Okay</button>
+      <button class="chip" data-text="I am busy right now, will reply soon.">🕒 Busy, reply soon</button>
+      <button class="chip" data-text="Working on it now.">💼 Working on it</button>
+      <button class="chip" data-text="Received, thank you!">✓ Received, thanks</button>
+      <button class="chip" data-text="Please call me when you are free.">📞 Call me when free</button>
+    </div>
+
+    <!-- Input -->
+    <form class="input-row" id="replyForm">
+      <input
+        type="text"
+        id="replyInput"
+        class="input-box"
+        placeholder="Type a fast message... (Enter to send)"
+        autocomplete="off"
+      />
+      <button type="submit" class="send-btn" id="sendBtn" title="Send quick reply">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    let activeConvId = '';
+
+    const card = document.getElementById('card');
+    const avatarLetter = document.getElementById('avatarLetter');
+    const senderNameEl = document.getElementById('senderName');
+    const messagePreviewEl = document.getElementById('messagePreview');
+    const replyInput = document.getElementById('replyInput');
+    const replyForm = document.getElementById('replyForm');
+    const closeBtn = document.getElementById('closeBtn');
+    const headerClickArea = document.getElementById('headerClickArea');
+
+    if (window.electronAPI && window.electronAPI.onQuickReplyLoad) {
+      window.electronAPI.onQuickReplyLoad((data) => {
+        if (!data) return;
+        activeConvId = data.conversationId || '';
+
+        const name = data.senderName || 'Colleague';
+        senderNameEl.textContent = name;
+        avatarLetter.textContent = (name.trim()[0] || 'U').toUpperCase();
+        messagePreviewEl.textContent = `"${data.messagePreview || 'New message'}"`;
+
+        if (data.isDark === false) {
+          card.className = 'card light';
+        } else {
+          card.className = 'card dark';
+        }
+
+        replyInput.value = '';
+      });
+    }
+
+    // Click header to open/restore the main app
+    headerClickArea.addEventListener('click', (e) => {
+      if (e.target.closest('#closeBtn')) return;
+      if (window.electronAPI && window.electronAPI.openAppFromNotification) {
+        window.electronAPI.openAppFromNotification({ conversationId: activeConvId });
+      }
+    });
+
+    // Close button
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.electronAPI && window.electronAPI.closeDesktopQuickReply) {
+        window.electronAPI.closeDesktopQuickReply();
+      }
+    });
+
+    // Preset chips
+    document.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const text = btn.getAttribute('data-text');
+        if (text && window.electronAPI && window.electronAPI.sendQuickReplyAction) {
+          window.electronAPI.sendQuickReplyAction({
+            conversationId: activeConvId,
+            content: text
+          });
+        }
+      });
+    });
+
+    // Submit custom text
+    replyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = replyInput.value.trim();
+      if (!val) return;
+      if (window.electronAPI && window.electronAPI.sendQuickReplyAction) {
+        window.electronAPI.sendQuickReplyAction({
+          conversationId: activeConvId,
+          content: val
+        });
+        replyInput.value = '';
+      }
+    });
+  </script>
+</body>
+</html>

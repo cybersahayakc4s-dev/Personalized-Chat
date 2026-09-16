@@ -24,6 +24,7 @@ import {
   Megaphone,
   Film,
   UserX,
+  Reply,
   Image as ImageIcon
 } from 'lucide-react';
 import { applySmartFormatting, handleSmartEnter, handleFormattingShortcuts, FormatType } from '../../utils/textFormatting';
@@ -43,6 +44,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
     currentUser,
     users = [],
     sendMessage,
+    replyingToMessage,
+    setReplyingToMessage,
     theme
   } = useChat() as any;
 
@@ -133,6 +136,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
     applySmartFormatting(textareaRef.current, text, setText, formatType);
   };
 
+  const replySender = React.useMemo(() => {
+    if (!replyingToMessage) return null;
+    return users.find((u: User) => u.id === replyingToMessage.senderId) || null;
+  }, [replyingToMessage, users]);
+
+  useEffect(() => {
+    if (replyingToMessage && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [replyingToMessage]);
+
   const handleSend = () => {
     if (isSubmittingRef.current || !canPost) return;
     const trimmed = text.trim();
@@ -141,11 +155,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
     isSubmittingRef.current = true;
     const contentToSend = text;
     const attachmentsToSend = [...attachments];
-    const replyToSend = replyToId;
+    const replyToSend = replyToId || replyingToMessage?.id;
 
     setText('');
     setAttachments([]);
     setShowEmojiPicker(false);
+    setReplyingToMessage?.(null);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -257,6 +272,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
 
     // 1. Formatting keyboard shortcuts: Ctrl/Cmd + B, I, Shift+X, E
     if (textareaRef.current && handleFormattingShortcuts(e, textareaRef.current, text, setText)) {
+      return;
+    }
+
+    // Escape cancels active reply
+    if (e.key === 'Escape' && replyingToMessage) {
+      e.preventDefault();
+      setReplyingToMessage?.(null);
       return;
     }
 
@@ -388,13 +410,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
                   </div>
                 )}
                 <div className="min-w-0 max-w-[140px]">
-                  <p className="truncate font-mono text-[11px] font-semibold text-slate-100">{att.name}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{(att.size / 1024).toFixed(1)} KB</p>
+                  <p className={`truncate font-mono text-[11px] font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{att.name}</p>
+                  <p className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{(att.size / 1024).toFixed(1)} KB</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}
-                  className="ml-1 p-1 text-slate-400 hover:text-rose-400 rounded transition"
+                  className={`ml-1 p-1 rounded transition ${isDark ? 'text-slate-400 hover:text-rose-400' : 'text-slate-500 hover:text-rose-600'}`}
                   title="Remove file"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -402,6 +424,37 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Quoted Reply Banner */}
+      {replyingToMessage && (
+        <div className={`mb-2 px-3.5 py-2 rounded-xl border-l-4 border-blue-500 flex items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150 ${
+          isDark
+            ? 'bg-[#151D2C] border border-[#273549] border-l-blue-500 text-slate-200'
+            : 'bg-blue-50/90 border border-blue-200 border-l-blue-600 text-slate-800'
+        }`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0">
+              <Reply className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="font-semibold text-xs text-blue-500 mr-2">
+                Replying to {replySender?.name || 'Message'}:
+              </span>
+              <span className="italic truncate text-[11.5px] opacity-85 inline-block max-w-[280px] sm:max-w-[480px] align-bottom">
+                {replyingToMessage.content || (replyingToMessage.attachments?.length ? `[Attachment: ${replyingToMessage.attachments[0].name}]` : 'Message')}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingToMessage(null)}
+            className="p-1 rounded-md text-slate-400 hover:text-rose-400 hover:bg-slate-700/40 transition cursor-pointer flex-shrink-0"
+            title="Cancel reply (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

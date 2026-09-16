@@ -1,10 +1,27 @@
+import { isElectron, getElectronApi } from '../utils/electron';
+
 // REST client for Personalize Chat API
 export function getServerBaseUrl(): string {
   if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem('personalize_server_url') || sessionStorage.getItem('personalize_server_url');
+  // 1. Runtime override via localStorage/sessionStorage
+  const stored = localStorage.getItem('chat_server_base_url') ||
+                 localStorage.getItem('personalize_server_url') ||
+                 sessionStorage.getItem('personalize_server_url');
   if (stored && stored.trim()) {
     return stored.trim().replace(/\/$/, '');
   }
+
+  // 2. Build-time environment variable VITE_CHAT_SERVER_BASE_URL
+  const envUrl = import.meta.env.VITE_CHAT_SERVER_BASE_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/$/, '');
+  }
+
+  // 3. Fallback: If running inside Electron or via file:// protocol, default to http://localhost:8000
+  if (window.location.protocol === 'file:' || window.location.origin === 'null' || isElectron()) {
+    return 'http://localhost:8000';
+  }
+
   return '';
 }
 
@@ -12,8 +29,10 @@ export function setServerBaseUrl(url: string) {
   if (typeof window === 'undefined') return;
   const clean = (url || '').trim().replace(/\/$/, '');
   if (clean) {
+    localStorage.setItem('chat_server_base_url', clean);
     localStorage.setItem('personalize_server_url', clean);
   } else {
+    localStorage.removeItem('chat_server_base_url');
     localStorage.removeItem('personalize_server_url');
   }
 }
@@ -24,29 +43,47 @@ export function getApiBase(): string {
 }
 
 export function getStoredToken(): string | null {
+  if (isElectron()) {
+    return sessionStorage.getItem('chat_token');
+  }
   return sessionStorage.getItem('chat_token') || localStorage.getItem('chat_token');
 }
 
 export function getStoredRefreshToken(): string | null {
+  if (isElectron()) {
+    // In Electron, refresh token is securely stored in safeStorage via IPC
+    return null;
+  }
   return sessionStorage.getItem('chat_refresh_token') || localStorage.getItem('chat_refresh_token');
 }
 
 export function setStoredToken(token: string, remember: boolean = true) {
   sessionStorage.setItem('chat_token', token);
-  if (remember) {
+  if (!isElectron() && remember) {
     localStorage.setItem('chat_token', token);
   }
 }
 
 export function setStoredTokens(accessToken: string, refreshToken?: string, remember: boolean = true) {
   sessionStorage.setItem('chat_token', accessToken);
-  if (remember) {
+  if (!isElectron() && remember) {
     localStorage.setItem('chat_token', accessToken);
   }
   if (refreshToken) {
-    sessionStorage.setItem('chat_refresh_token', refreshToken);
-    if (remember) {
-      localStorage.setItem('chat_refresh_token', refreshToken);
+    if (isElectron()) {
+      // In Electron: store refresh token strictly in safeStorage (DPAPI)
+      const electronApi = getElectronApi();
+      if (electronApi) {
+        electronApi.setRefreshToken(refreshToken).catch(err => {
+          console.error('[api] Failed to save refresh token in safeStorage:', err);
+        });
+      }
+    } else {
+      // Outside Electron: normal web browser behavior
+      sessionStorage.setItem('chat_refresh_token', refreshToken);
+      if (remember) {
+        localStorage.setItem('chat_refresh_token', refreshToken);
+      }
     }
   }
 }
@@ -58,12 +95,30 @@ export function clearStoredAuth() {
   sessionStorage.removeItem('chat_token');
   sessionStorage.removeItem('chat_refresh_token');
   sessionStorage.removeItem('chat_user');
+
+  if (isElectron()) {
+    const electronApi = getElectronApi();
+    if (electronApi) {
+      electronApi.clearRefreshToken().catch(err => {
+        console.error('[api] Failed to clear refresh token in safeStorage:', err);
+      });
+    }
+  }
 }
 
 let refreshPromise: Promise<string | null> | null = null;
 
 export async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getStoredRefreshToken();
+  let refreshToken: string | null = null;
+  if (isElectron()) {
+    const electronApi = getElectronApi();
+    if (electronApi) {
+      refreshToken = await electronApi.getRefreshToken();
+    }
+  } else {
+    refreshToken = getStoredRefreshToken();
+  }
+
   if (!refreshToken) {
     return null;
   }

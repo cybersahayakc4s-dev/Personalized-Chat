@@ -23,8 +23,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         if not self.ALLOWED_ORIGINS:
-            return ["http://localhost:5173"]
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+            return ["http://localhost:5173", "file://", "null"]
+        origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        for extra in ["file://", "null"]:
+            if extra not in origins:
+                origins.append(extra)
+        return origins
 
     # Database: SQLite fallback for local development, PostgreSQL for Docker
     DATABASE_URL: str = os.getenv(
@@ -82,7 +86,8 @@ class Settings(BaseSettings):
         # In production, disallow pure localhost CORS
         if self.ENVIRONMENT.lower() == "production":
             origins = self.cors_origins
-            if not origins or all("localhost" in o or "127.0.0.1" in o for o in origins):
+            web_origins = [o for o in origins if o not in ["file://", "null"]]
+            if not web_origins or all("localhost" in o or "127.0.0.1" in o for o in web_origins):
                 errors.append(
                     "ALLOWED_ORIGINS: ENVIRONMENT=production requires explicit production domains in ALLOWED_ORIGINS "
                     "(cannot rely solely on localhost/127.0.0.1)."

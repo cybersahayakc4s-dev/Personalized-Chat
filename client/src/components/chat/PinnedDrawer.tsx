@@ -24,7 +24,7 @@ export const PinnedDrawer: React.FC = () => {
   );
 
   return (
-    <div className={`w-80 lg:w-[360px] border-l ${
+    <div className={`w-full max-w-[360px] border-l ${
       isDark ? 'border-zinc-800 bg-[#18181B] text-zinc-100' : 'border-slate-200 bg-white text-slate-900'
     } flex flex-col h-full z-20 animate-in slide-in-from-right duration-200 shadow-sm transition-colors`}>
       {/* Header */}

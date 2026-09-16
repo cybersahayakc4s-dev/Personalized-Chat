@@ -87,12 +87,22 @@ def create_chat_message(
             if receiver.status == UserStatus.deleted:
                 raise MessageValidationError(400, "Recipient account has been deleted")
 
-    # Validate reply_to_id
+    # Validate reply_to_id strictly within the same conversation
     numeric_reply_to: Optional[int] = None
     if reply_to_id:
         orig = db.query(Message).filter(Message.id == reply_to_id).first()
         if orig:
-            numeric_reply_to = orig.id
+            is_valid_reply = False
+            if target_receiver_id and orig.receiver_id:
+                # Both are 1:1 DMs between the identical pair of participants
+                is_valid_reply = ({sender.id, target_receiver_id} == {orig.sender_id, orig.receiver_id})
+            elif team_enum and orig.team == team_enum and orig.receiver_id is None:
+                is_valid_reply = True
+            elif msg_format and orig.format == msg_format and orig.receiver_id is None and orig.team is None:
+                is_valid_reply = True
+
+            if is_valid_reply:
+                numeric_reply_to = orig.id
 
     # Idempotency Safeguard: prevent duplicate insertion of identical message within 2.5 seconds
     recent_window = datetime.utcnow() - timedelta(seconds=2.5)

@@ -21,6 +21,7 @@ import {
   Bell,
   BellOff,
   Sliders,
+  Clock,
   X
 } from 'lucide-react';
 import { getUserDepartmentChannel } from '../../utils/rbac';
@@ -53,6 +54,7 @@ export const ChatArea: React.FC = () => {
     requestDesktopNotificationPermission,
     sendTestDesktopNotification,
     setNotificationSettingsModalOpen,
+    setScheduleUpdateModalOpen,
     addToast
   } = useChat() as any;
 
@@ -94,7 +96,7 @@ export const ChatArea: React.FC = () => {
   // Filter messages for current conversation with strict deduplication
   const currentMessages = useMemo(() => {
     const raw = messages.filter(
-      (m: any) => m.conversationId === activeConversationId && !m.replyToId
+      (m: any) => m.conversationId === activeConversationId
     );
 
     // Identify confirmed messages by signature (senderId + content)
@@ -249,7 +251,16 @@ export const ChatArea: React.FC = () => {
   } else if (channelData) {
     const isTeam = channelData.type === 'team' || Boolean(channelData.team);
     headerTitle = isTeam ? channelData.name : `# ${channelData.name}`;
-    const memberCount = channelData.team ? users.filter((u: any) => u.team === channelData.team).length : users.length;
+    const activeWorkspaceUsers = (users || []).filter((u: any) =>
+      u.account_status !== 'deleted' &&
+      u.status !== 'deleted' &&
+      !u.is_deleted &&
+      !u.name?.includes('[Deleted User]') &&
+      !(u.email && u.email?.includes('@archived.internal'))
+    );
+    const memberCount = channelData.team
+      ? activeWorkspaceUsers.filter((u: any) => u.team === channelData.team || u.role === 'main_admin').length
+      : activeWorkspaceUsers.length;
     headerSubtitle = isTeam ? `Department • ${memberCount} member${memberCount === 1 ? '' : 's'}` : `Channel • ${memberCount} member${memberCount === 1 ? '' : 's'}`;
   }
 
@@ -400,6 +411,22 @@ export const ChatArea: React.FC = () => {
           >
             <Sliders className="w-3.5 h-3.5 text-slate-400" />
           </button>
+
+          {/* Main-Admin Schedule Daily Updates Action in #updates */}
+          {isUpdates && currentUser?.role === 'main_admin' && (
+            <button
+              onClick={() => setScheduleUpdateModalOpen(true)}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
+                isDark
+                  ? 'bg-[#182030] hover:bg-[#202B40] text-amber-400 border-[#2A364E]'
+                  : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-amber-600 border-[#C6D0DC] shadow-2xs'
+              }`}
+              title="Schedule daily update requests (Alarm Clock)"
+              aria-label="Schedule daily update requests"
+            >
+              <Clock className="w-4 h-4 text-amber-400" />
+            </button>
+          )}
 
           {/* Search in Conversation */}
           <button

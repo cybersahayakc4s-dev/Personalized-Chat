@@ -10,6 +10,7 @@ import { NewChannelModal } from './components/modals/NewChannelModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
 import { LoginModal } from './components/modals/LoginModal';
 import { UnauthorizedModal } from './components/modals/UnauthorizedModal';
+import { ScheduleUpdateModal } from './components/modals/ScheduleUpdateModal';
 
 import { CommandPalette } from './components/modals/CommandPalette';
 import { ToastContainer, ToastMessage } from './components/common/Toast';
@@ -22,6 +23,9 @@ function ChatApp() {
     setCommandPaletteOpen,
     toasts,
     dismissToast,
+    addToast,
+    scheduleUpdateModalOpen,
+    setScheduleUpdateModalOpen,
     isAuthenticated
   } = useChat();
 
@@ -62,6 +66,60 @@ function ChatApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setCommandPaletteOpen]);
 
+  // Automated Daily Updates Alarm Checker
+  React.useEffect(() => {
+    const checkDailyAlarm = () => {
+      try {
+        const isEnabled = localStorage.getItem('chat_daily_update_enabled');
+        if (isEnabled === 'false') return;
+
+        const targetTime = localStorage.getItem('chat_daily_update_time') || '18:00';
+        const [targetH, targetM] = targetTime.split(':').map(Number);
+        const now = new Date();
+        const currentH = now.getHours();
+        const currentM = now.getMinutes();
+
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const lastFired = localStorage.getItem('chat_daily_update_last_fired');
+
+        if (lastFired !== todayKey) {
+          if (currentH > targetH || (currentH === targetH && currentM >= targetM)) {
+            localStorage.setItem('chat_daily_update_last_fired', todayKey);
+            const promptMsg =
+              localStorage.getItem('chat_daily_update_msg') ||
+              'Please submit your daily end-of-day updates, milestones, and blockers in #updates.';
+
+            if (addToast) {
+              addToast({
+                type: 'info',
+                title: '⏰ Daily Team Update Reminder',
+                description: promptMsg
+              });
+            }
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification('⏰ Daily Team Update Reminder', {
+                  body: promptMsg,
+                  icon: '/favicon.ico',
+                  tag: 'daily-update-reminder'
+                });
+              } catch (e) {
+                // ignore
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    checkDailyAlarm();
+    const interval = setInterval(checkDailyAlarm, 30000);
+    return () => clearInterval(interval);
+  }, [addToast]);
+
   // Security Gate: If not authenticated, require login first (cannot access or peek at chat workspace)
   if (!isAuthenticated) {
     return (
@@ -101,6 +159,10 @@ function ChatApp() {
       <UserProfileModal />
       <LoginModal />
       <UnauthorizedModal />
+      <ScheduleUpdateModal
+        isOpen={scheduleUpdateModalOpen}
+        onClose={() => setScheduleUpdateModalOpen(false)}
+      />
 
       {/* Persistent Non-Blocking Toasts */}
       <ToastContainer

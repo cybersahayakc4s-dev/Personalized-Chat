@@ -27,6 +27,7 @@ import {
 import { sounds } from '../utils/audio';
 import { api, getStoredToken, setStoredToken, setStoredTokens, getStoredRefreshToken, clearStoredAuth, getServerBaseUrl, setServerBaseUrl } from '../services/api';
 import { getSocket, disconnectSocket } from '../services/socket';
+import { isElectron, getElectronApi } from '../utils/electron';
 import { ToastMessage } from '../components/common/Toast';
 import {
   isChannelAuthorized,
@@ -104,6 +105,10 @@ interface ChatContextType {
   setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   highlightedMessageId: string | null;
   setHighlightedMessageId: (id: string | null) => void;
+  replyingToMessage: Message | null;
+  setReplyingToMessage: (msg: Message | null) => void;
+  scheduleUpdateModalOpen: boolean;
+  setScheduleUpdateModalOpen: (open: boolean) => void;
   setLoginModalOpen: (open: boolean) => void;
   setProfileModalUser: (user: User | null) => void;
   setSidebarMobileOpen: (open: boolean) => void;
@@ -115,6 +120,7 @@ interface ChatContextType {
   // Chat Actions
   sendMessage: (content: string, attachments?: Attachment[], replyToId?: string, format?: FormattingFormat) => Promise<void>;
   retrySendMessage: (messageId: string) => Promise<void>;
+  dismissFailedMessage: (messageId: string) => void;
   editMessage: (messageId: string, newContent: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
@@ -279,6 +285,8 @@ function mapBackendMessage(m: any, defaultConvId: string): Message {
   const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : '';
   const attachments: Attachment[] = (m.attachments || []).map((att: any) => {
     const rawId = String(att.id || '');
+    const serverBase = getServerBaseUrl() || (typeof window !== 'undefined' && window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000');
+    
     let viewUrl = att.url;
     if (viewUrl && !viewUrl.includes('?token=') && currentToken) {
       viewUrl = `${viewUrl}${tokenParam}`;
@@ -287,12 +295,18 @@ function mapBackendMessage(m: any, defaultConvId: string): Message {
     } else if (!viewUrl && att.file_path) {
       viewUrl = `/uploads/${att.file_path}`;
     }
+    if (viewUrl && viewUrl.startsWith('/') && serverBase) {
+      viewUrl = `${serverBase}${viewUrl}`;
+    }
 
     let downloadUrl = att.download_url;
     if (downloadUrl && !downloadUrl.includes('?token=') && currentToken) {
       downloadUrl = `${downloadUrl}${tokenParam}`;
     } else if (!downloadUrl && rawId && !rawId.startsWith('att-')) {
       downloadUrl = `/api/attachments/${rawId}/download${tokenParam}`;
+    }
+    if (downloadUrl && downloadUrl.startsWith('/') && serverBase) {
+      downloadUrl = `${serverBase}${downloadUrl}`;
     }
 
     return {
@@ -601,6 +615,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [searchModalOpen, setSearchModalOpen] = useState<boolean>(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [scheduleUpdateModalOpen, setScheduleUpdateModalOpen] = useState<boolean>(false);
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const [profileModalUser, setProfileModalUser] = useState<User | null>(null);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState<boolean>(false);
@@ -632,6 +648,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveConversationIdState(id);
     setActiveThreadMessageId(null);
     setSidebarMobileOpen(false);
+    setReplyingToMessage(null);
   }, [channels, openUnauthorizedModal]);
 
   const processedRepliesRef = useRef<Set<string>>(new Set());
@@ -686,6 +703,29 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigator.serviceWorker.removeEventListener('message', handleSwMessage);
     };
   }, [sendQuickReply, openQuickReply, setActiveConversationId]);
+
+  // Electron Desktop Quick Reply listener: handles replies sent from the bottom-left desktop popup
+  useEffect(() => {
+    if (!isElectron()) return;
+    const electronApi = getElectronApi();
+    if (!electronApi) return;
+
+    if (electronApi.onQuickReplySend) {
+      electronApi.onQuickReplySend(({ conversationId, content }) => {
+        if (conversationId && content) {
+          sendQuickReply(conversationId, content, true);
+        }
+      });
+    }
+
+    if (electronApi.onSwitchConversation) {
+      electronApi.onSwitchConversation(({ conversationId }) => {
+        if (conversationId) {
+          setActiveConversationId(conversationId);
+        }
+      });
+    }
+  }, [sendQuickReply, setActiveConversationId]);
 
   // Deep-link query param listener on mount and window focus (e.g. from desktop notifications)
   useEffect(() => {
@@ -797,7 +837,43 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Load initial backend data or login automatically with default admin if no token
   useEffect(() => {
     const initAuth = async () => {
-      let activeTok = getStoredToken();
+      let activeTok: string | null = null;
+
+      // Electron-specific silent auto-login via safeStorage
+      if (isElectron()) {
+        const electronApi = getElectronApi();
+        if (electronApi) {
+          try {
+            const savedRefreshToken = await electronApi.getRefreshToken();
+            if (savedRefreshToken) {
+              const res = await api.refresh(savedRefreshToken);
+              if (res && res.access_token) {
+                activeTok = res.access_token;
+                setStoredTokens(res.access_token, res.refresh_token);
+                setToken(res.access_token);
+                setIsAuthenticated(true);
+                setLoginModalOpen(false);
+              } else {
+                await electronApi.clearRefreshToken();
+                clearStoredAuth();
+                activeTok = null;
+              }
+            } else {
+              activeTok = null;
+              clearStoredAuth();
+            }
+          } catch (refreshErr: any) {
+            console.warn('[Electron] Auto-login silent refresh failed:', refreshErr);
+            (window as any).__last_init_auth_error = refreshErr?.message || String(refreshErr);
+            await electronApi.clearRefreshToken();
+            clearStoredAuth();
+            activeTok = null;
+          }
+        }
+      } else {
+        activeTok = getStoredToken();
+      }
+
       if (!activeTok) {
         setIsAuthenticated(false);
         setLoginModalOpen(true);
@@ -1141,13 +1217,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const sender = usersRef.current.find(u => u.id === incoming.senderId);
         const senderName = sender ? sender.name : (msgPayload.sender_name || 'Colleague');
 
+        // Resolve message preview and toast title
+        const preview = incoming.content && incoming.content.length > 50
+          ? incoming.content.slice(0, 50) + '...'
+          : (incoming.content || (incoming.attachments?.length ? 'Sent an attachment' : 'Sent a message'));
+
+        const toastTitle = isPersonalDm
+          ? `New message from ${senderName}`
+          : (() => {
+              const chan = channelsRef.current.find(c => c.id === incoming.conversationId);
+              return chan ? `#${chan.name} • ${senderName}` : `Channel message from ${senderName}`;
+            })();
+
         if (isDifferentConversation) {
-          // Increment unread count for conversation & sender
-          setUnreadCounts(prev => ({
-            ...prev,
-            [incoming.conversationId]: (prev[incoming.conversationId] || 0) + 1,
-            [incoming.senderId]: (prev[incoming.senderId] || 0) + 1
-          }));
+          // Increment unread count for conversation only.
+          // ONLY also increment sender's DM counter when it is truly a 1:1 DM —
+          // channel messages must NOT bleed into the DM unread badge for that sender.
+          setUnreadCounts(prev => {
+            const next = {
+              ...prev,
+              [incoming.conversationId]: (prev[incoming.conversationId] || 0) + 1,
+            };
+            if (isPersonalDm) {
+              next[incoming.senderId] = (prev[incoming.senderId] || 0) + 1;
+            }
+            return next;
+          });
 
           // Check whether the recipient user is authorized to post in this conversation
           const meUser = usersRef.current.find(u => u.id === myId);
@@ -1159,13 +1254,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Dispatch in-app Toast notification (only show Quick Reply action if authorized to post)
-          const preview = incoming.content && incoming.content.length > 50
-            ? incoming.content.slice(0, 50) + '...'
-            : (incoming.content || (incoming.attachments?.length ? 'Sent an attachment' : 'Sent a message'));
-
           addToast({
             type: 'info',
-            title: `New message from ${senderName}`,
+            title: toastTitle,
             description: preview,
             action: userCanReply ? {
               label: 'Quick Reply',
@@ -1189,12 +1280,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
               sock.emit('chat_read', { sender_id: Number(otherNum) });
             }
           }
-          // Explicitly ensure unread counts are 0 for current conversation & sender
-          setUnreadCounts(prev => ({
-            ...prev,
-            [incoming.conversationId]: 0,
-            [incoming.senderId]: 0
-          }));
+          // Explicitly ensure unread counts are 0 for current conversation.
+          // Mirror the same DM guard: only zero the sender's DM counter when it's a 1:1 DM,
+          // so that an unrelated DM unread badge is not accidentally cleared by a channel message.
+          setUnreadCounts(prev => {
+            const next = {
+              ...prev,
+              [incoming.conversationId]: 0,
+            };
+            if (isPersonalDm) {
+              next[incoming.senderId] = 0;
+            }
+            return next;
+          });
           setUsers(prev =>
             prev.map(u => (u.id === incoming.senderId || u.id === incoming.senderId.replace('usr_', '')) ? { ...u, unreadCount: 0 } : u)
           );
@@ -1226,45 +1324,66 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // Native Windows Desktop Notification (WhatsApp style bottom-right popup):
-        // Trigger if scope allowed AND (user is on a different conversation OR window is backgrounded/minimized/hidden)
-        if (scopeAllowed && (isDifferentConversation || isWindowHidden)) {
-          const matchedChannel = !isPersonalDm
-            ? channelsRef.current.find(c => c.id === incoming.conversationId)
-            : undefined;
-
-          const otherId = isPersonalDm
-            ? incoming.senderId.replace('usr_', '')
-            : undefined;
-
-          const team = !isPersonalDm
-            ? (matchedChannel?.team || getTeamNameFromConversationId(channelsRef.current, incoming.conversationId) || undefined)
-            : undefined;
-
-          const meUser = usersRef.current.find(u => u.id === myId);
-          let notifCanReply = true;
-          if (incoming.conversationId === 'c-announcements') {
-            notifCanReply = meUser?.role === 'main_admin';
-          } else if (incoming.conversationId === 'c-updates') {
-            notifCanReply = meUser?.role === 'main_admin' || Boolean(meUser?.is_team_leader) || Boolean(meUser?.title && meUser.title.toLowerCase().includes('lead'));
+        // Electron Notification: If app is minimized or backgrounded, show desktop Quick Reply at bottom-left
+        if (isElectron()) {
+          const electronApi = getElectronApi();
+          if (electronApi?.isAppMinimized && electronApi?.showDesktopQuickReply) {
+            electronApi.isAppMinimized().then(isMin => {
+              if (isMin && scopeAllowed) {
+                const isDark = typeof document !== 'undefined'
+                  ? !document.documentElement.classList.contains('light')
+                  : true;
+                electronApi.showDesktopQuickReply!({
+                  senderName,
+                  senderHandle: sender?.handle || 'user',
+                  messagePreview: preview,
+                  conversationId: incoming.conversationId,
+                  senderId: incoming.senderId,
+                  isDark
+                });
+              }
+            }).catch(() => {});
           }
+        } else {
+          // Browser / PWA: Native Windows Desktop Notification (WhatsApp style bottom-right popup)
+          if (scopeAllowed && (isDifferentConversation || isWindowHidden)) {
+            const matchedChannel = !isPersonalDm
+              ? channelsRef.current.find(c => c.id === incoming.conversationId)
+              : undefined;
 
-          showIncomingMessageNotification({
-            senderName,
-            channelName: matchedChannel ? matchedChannel.name : undefined,
-            content: incoming.content,
-            conversationId: incoming.conversationId,
-            isDm: isPersonalDm,
-            recipientId: otherId,
-            teamName: team,
-            canReply: notifCanReply,
-            hasAttachments: Boolean(incoming.attachments?.length),
-            attachmentName: incoming.attachments?.[0]?.name,
-            privacyMode: Boolean(currentPrefs.privacyMode),
-            onClick: () => {
-              setActiveConversationId(incoming.conversationId);
+            const otherId = isPersonalDm
+              ? incoming.senderId.replace('usr_', '')
+              : undefined;
+
+            const team = !isPersonalDm
+              ? (matchedChannel?.team || getTeamNameFromConversationId(channelsRef.current, incoming.conversationId) || undefined)
+              : undefined;
+
+            const meUser = usersRef.current.find(u => u.id === myId);
+            let notifCanReply = true;
+            if (incoming.conversationId === 'c-announcements') {
+              notifCanReply = meUser?.role === 'main_admin';
+            } else if (incoming.conversationId === 'c-updates') {
+              notifCanReply = meUser?.role === 'main_admin' || Boolean(meUser?.is_team_leader) || Boolean(meUser?.title && meUser.title.toLowerCase().includes('lead'));
             }
-          });
+
+            showIncomingMessageNotification({
+              senderName,
+              channelName: matchedChannel ? matchedChannel.name : undefined,
+              content: incoming.content,
+              conversationId: incoming.conversationId,
+              isDm: isPersonalDm,
+              recipientId: otherId,
+              teamName: team,
+              canReply: notifCanReply,
+              hasAttachments: Boolean(incoming.attachments?.length),
+              attachmentName: incoming.attachments?.[0]?.name,
+              privacyMode: Boolean(currentPrefs.privacyMode),
+              onClick: () => {
+                setActiveConversationId(incoming.conversationId);
+              }
+            });
+          }
         }
       }
     });
@@ -1535,7 +1654,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const dmMessages = messages.filter(m => m.conversationId === dmId);
       const lastMessage = dmMessages.length > 0 ? dmMessages[dmMessages.length - 1] : undefined;
       const isActive = activeConversationId === dmId;
-      const unreadCount = isActive ? 0 : (unreadCounts[dmId] !== undefined ? unreadCounts[dmId] : (unreadCounts[u.id] !== undefined ? unreadCounts[u.id] : 0));
+      const unreadCount = isActive ? 0 : (unreadCounts[dmId] || 0);
 
       list.push({
         id: dmId,
@@ -1723,7 +1842,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Logout handler
   const logout = useCallback(async () => {
-    const rf = getStoredRefreshToken();
+    let rf = getStoredRefreshToken();
+    if (isElectron()) {
+      const electronApi = getElectronApi();
+      if (electronApi) {
+        rf = await electronApi.getRefreshToken();
+      }
+    }
     if (rf) {
       try {
         await api.logout(rf);
@@ -1735,6 +1860,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('chat_last_active_user_id', currentUserId);
     }
     clearStoredAuth();
+    if (isElectron()) {
+      const electronApi = getElectronApi();
+      if (electronApi) {
+        await electronApi.clearRefreshToken().catch(() => {});
+      }
+    }
     setToken(null);
     setIsAuthenticated(false);
     disconnectSocket();
@@ -1909,6 +2040,52 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         teamName = getTeamNameFromConversationId(channels, target.conversationId);
       }
 
+      // 1. If message has raw file attachments that need upload:
+      const rawFileAttachments = (target.attachments || []).filter(a => a.rawFile);
+      if (rawFileAttachments.length > 0) {
+        for (let i = 0; i < rawFileAttachments.length; i++) {
+          const fileAtt = rawFileAttachments[i];
+          const formData = new FormData();
+          formData.append('file', fileAtt.rawFile as File);
+          if (recipientId) formData.append('receiver_id', recipientId);
+          if (teamName) formData.append('team', teamName);
+          if (msgFormat) formData.append('format', msgFormat);
+          if (i === 0 && target.content?.trim()) {
+            formData.append('content', target.content.trim());
+          }
+
+          const res = await api.uploadAttachment(formData);
+          if (res && res.id) {
+            removePendingMessage(clientId);
+            const serverMsg = mapBackendMessage(res, target.conversationId);
+            setMessages(prev => {
+              if (prev.some(m => m.id === serverMsg.id)) {
+                return prev.filter(m => m.id !== clientId && m.clientId !== clientId && !(m.id.startsWith('msg-temp-') && m.senderId === serverMsg.senderId));
+              }
+              return prev.map(m => (m.id === clientId || m.clientId === clientId) ? serverMsg : m);
+            });
+          }
+        }
+        return;
+      }
+
+      // 2. If message has no raw file and content is empty:
+      if (!target.content?.trim()) {
+        const errDesc = (target.attachments && target.attachments.length > 0)
+          ? 'Attachment file cache expired. Please re-attach the file to send.'
+          : 'Message content cannot be empty.';
+        updatePendingMessageStatus(clientId, 'failed', errDesc);
+        setMessages(prev =>
+          prev.map(m => (m.id === messageId || m.clientId === messageId) ? { ...m, status: 'failed', sendError: errDesc } : m)
+        );
+        addToast({
+          type: 'error',
+          title: 'Cannot retry message',
+          description: errDesc
+        });
+        return;
+      }
+
       const numericReplyTo = target.replyToId ? Number(target.replyToId.replace('msg-', '')) : undefined;
 
       const res = await api.sendMessage({
@@ -1944,25 +2121,51 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [messages, currentUser.id, channels, addToast]);
 
+  // Dismiss a failed or unsent client message
+  const dismissFailedMessage = useCallback((messageId: string) => {
+    removePendingMessage(messageId);
+    setMessages(prev => prev.filter(m => m.id !== messageId && m.clientId !== messageId));
+  }, []);
+
   // Edit Message
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     const trimmed = newContent.trim();
-    setMessages(prev =>
-      prev.map(m => (m.id === messageId ? { ...m, content: trimmed, editedAt: new Date().toISOString() } : m))
-    );
+
+    // Capture pre-mutation snapshot for rollback
+    let snapshot: typeof messages | null = null;
+    setMessages(prev => {
+      snapshot = prev;
+      return prev.map(m => (m.id === messageId ? { ...m, content: trimmed, editedAt: new Date().toISOString() } : m));
+    });
 
     const numericId = messageId.replace('msg-', '');
     try {
       await api.editMessage(numericId, trimmed);
     } catch (e) {
       console.warn('Edit message API failed:', e);
+      // Rollback optimistic update
+      if (snapshot !== null) setMessages(snapshot);
+      addToast({
+        type: 'error',
+        title: 'Edit Failed',
+        description: 'Could not save your edit. The message has been restored.'
+      });
     }
-  }, []);
+  }, [addToast]);
 
   // Delete Message
   const deleteMessage = useCallback(async (messageId: string) => {
-    setMessages(prev =>
-      prev.map(m =>
+    if (messageId.startsWith('msg-client-') || messageId.startsWith('temp-') || messageId.startsWith('msg-temp-')) {
+      removePendingMessage(messageId);
+      setMessages(prev => prev.filter(m => m.id !== messageId && m.clientId !== messageId));
+      return;
+    }
+
+    // Capture pre-mutation snapshot for rollback
+    let snapshot: typeof messages | null = null;
+    setMessages(prev => {
+      snapshot = prev;
+      return prev.map(m =>
         m.id === messageId
           ? {
               ...m,
@@ -1972,21 +2175,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
               reactions: {}
             }
           : m
-      )
-    );
+      );
+    });
 
     const numericId = messageId.replace('msg-', '');
     try {
       await api.deleteMessage(numericId);
     } catch (e) {
       console.warn('Delete message API failed:', e);
+      // Rollback optimistic update
+      if (snapshot !== null) setMessages(snapshot);
+      addToast({
+        type: 'error',
+        title: 'Delete Failed',
+        description: 'Could not delete the message. It has been restored.'
+      });
     }
-  }, []);
+  }, [addToast]);
 
   // Toggle Reaction
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    setMessages(prev =>
-      prev.map(msg => {
+    // Capture pre-mutation snapshot for rollback
+    let snapshot: typeof messages | null = null;
+    setMessages(prev => {
+      snapshot = prev;
+      return prev.map(msg => {
         if (msg.id === messageId) {
           const currentReactions = { ...msg.reactions };
           const userList = currentReactions[emoji] || [];
@@ -2004,8 +2217,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { ...msg, reactions: currentReactions };
         }
         return msg;
-      })
-    );
+      });
+    });
     sounds.playPop();
 
     const numericId = messageId.replace('msg-', '');
@@ -2013,14 +2226,24 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.toggleReaction(numericId, emoji);
     } catch (e) {
       console.warn('Reaction API failed:', e);
+      // Rollback optimistic update
+      if (snapshot !== null) setMessages(snapshot);
+      addToast({
+        type: 'error',
+        title: 'Reaction Failed',
+        description: 'Could not save your reaction. Please try again.'
+      });
     }
-  }, [currentUser.id]);
+  }, [currentUser.id, addToast]);
 
   // Toggle Pin
   const togglePinMessage = useCallback(async (messageId: string) => {
-    setMessages(prev =>
-      prev.map(msg => (msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg))
-    );
+    // Capture pre-mutation snapshot for rollback
+    let snapshot: typeof messages | null = null;
+    setMessages(prev => {
+      snapshot = prev;
+      return prev.map(msg => (msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg));
+    });
     sounds.playPop();
 
     const numericId = messageId.replace('msg-', '');
@@ -2028,8 +2251,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.togglePin(numericId);
     } catch (e) {
       console.warn('Pin API failed:', e);
+      // Rollback optimistic update
+      if (snapshot !== null) setMessages(snapshot);
+      addToast({
+        type: 'error',
+        title: 'Pin Failed',
+        description: 'Could not update pin status. The message has been restored.'
+      });
     }
-  }, []);
+  }, [addToast]);
 
   // Update Status
   const updateUserStatus = useCallback((status: UserStatus, customStatus?: string) => {
@@ -2273,6 +2503,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         newChannelModalOpen,
         newDmModalOpen,
         searchModalOpen,
+        scheduleUpdateModalOpen,
         loginModalOpen,
         profileModalUser,
         typingUsers,
@@ -2294,6 +2525,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCommandPaletteOpen,
         highlightedMessageId,
         setHighlightedMessageId,
+        replyingToMessage,
+        setReplyingToMessage,
+        setScheduleUpdateModalOpen,
         setLoginModalOpen,
         setProfileModalUser,
         setSidebarMobileOpen,
@@ -2302,6 +2536,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         sendMessage,
         retrySendMessage,
+        dismissFailedMessage,
         editMessage,
         deleteMessage,
         toggleReaction,
