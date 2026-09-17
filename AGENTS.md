@@ -13,6 +13,7 @@ This file contains guidelines and information for AI agents working on the Perso
 - File uploads (default 500MB/file)
 - Real-time delivery via Socket.IO with live presence, sound, and desktop notifications
 - Message moderation — edit/soft-delete own messages; Main-Admin can soft-delete any message
+- **v2.2+ (merged PR #1)**: pinned messages, Team Updates carousel, schedule-timed updates, in-chat search, Electron desktop wrapper (`electron/`)
 
 ## Technology Stack
 
@@ -38,6 +39,7 @@ This file contains guidelines and information for AI agents working on the Perso
 │   │   └── styles/      # index.css (all styling/tokens)
 │   └── vite.config.js   # Dev proxy to :8000
 │
+├── electron/            # v2.2 Electron desktop wrapper (main.js, preload.js)
 ├── server/              # FastAPI backend
 │   ├── app/
 │   │   ├── main.py      # FastAPI app + Socket.IO ASGI app

@@ -1,10 +1,10 @@
 # VPS Deployment Session Record: Personalize Chat
 
-**Date**: September 16, 2026  
-**Previous Session**: September 15, 2026 (original VPS audit & bootstrap)
+**Date**: September 17, 2026  
+**Previous Session**: September 15–16, 2026 (audit, bootstrap, CI/CD fixes)
 **Target Host**: `teamai@187.127.148.60` (`srv1901377` / `cybersahayak-vps`)  
 **Public Hostname**: `https://chat.cybersahayak.cloud`  
-**Deployed Git SHA**: `77eab24ac2e63830ec0071ef9e884ba0001cb2eb` (auto-deployed, main HEAD)  
+**Deployed Git SHA**: `0bee36c54b5fad744ab58537e65b725736f6bc32` (auto-deployed via CI, main HEAD — includes v2.2 Electron merge)  
 **Repository**: `https://github.com/cybersahayakc4s-dev/Personalized-Chat.git`  
 **Target VPS Path**: `/opt/company/apps/personalize-chat/`  
 
@@ -183,6 +183,16 @@ The repo's `docker-compose.prod.yml` had `http://localhost:80/healthz` for clien
 | `a4dfd79` | ci: make deploy non-blocking | PASS | FAIL (continue-on-error) | — |
 | `a36870f` | ci: scp-based auto deploy | PASS | FAIL (tarball path) | — |
 | `77eab24` | ci: extract from tmp/ path | PASS | **PASS** | **Live, auto-deployed** |
+| `0bee36c` | merge PR #1: v2.2 Electron chat upgrades | PASS | **PASS** | **Live, auto-deployed** (current HEAD) |
+
+## 6B. v2.2 Electron — Whatsapp-Style Chat Integration (PR #1, merged `0bee36c`)
+
+Third-party merge on `main` delivered via `integration/v2.2-electron-chat-upgrades`:
+
+- **Electron desktop app**: new `electron/` (main.js 432 lines, preload.js, quick-reply.html), root `package.json` workspace, `scripts/verify_electron.cjs` + `scripts/test_security_regression.cjs`.
+- **WhatsApp-style chat**: pinned messages, Team Updates carousel (`TeamUpdatesCarousel.tsx`), schedule-timed updates (`ScheduleUpdateModal.tsx`), in-chat search, refreshed MessageItem/RightSidebar/LoginModal.
+- **API/security hardening**: `server/app/api/messages.py`, `server/app/core/config.py`, `server/app/services/message_service.py` + new client service methods.
+- **Post-merge verification**: CI green, auto-deploy applied to VPS, all 3 containers healthy, server `/health` OK. (Public curl re-check skipped this session due to restart.)
 
 ---
 
@@ -192,6 +202,7 @@ The repo's `docker-compose.prod.yml` had `http://localhost:80/healthz` for clien
 2. **Stale files in app dir**: Tarball extraction overwrites tracked files but doesn't delete files removed upstream (low risk for this small app).
 3. **`INITIAL_ADMIN_PASSWORD` in plaintext**: Currently in `.env` on VPS (mode 600, not in repo). Rotate after initial login.
 4. **Migrations safety gate**: CI test job scans push range for destructive SQL. VPS runs `alembic upgrade head`. No manual gate needed.
+5. **Session open items**: public URL curl re-check (chat 200 / health 200 on `0bee36c`) and `gh run` backfill after system restart; confirm `new client/package.json` deps built cleanly by CI (they did — deploy job passed).
 
 ---
 
