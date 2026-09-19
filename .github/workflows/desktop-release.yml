@@ -291,17 +291,15 @@ jobs:
 
             echo "=== [3/3] Pruning older archives (retaining last 2 previous versions) ==="
             cd "$ARCHIVE_DIR"
-            shopt -s nullglob
-            EXE_FILES=(*.exe)
-            if [ ${#EXE_FILES[@]} -gt 2 ]; then
+            COUNT=$(find . -maxdepth 1 -name "*.exe" 2>/dev/null | wc -l)
+            if [ "$COUNT" -gt 2 ]; then
               ls -t *.exe | tail -n +3 | while read -r old_exe; do
                 echo "Pruning older release archive: $old_exe and blockmap"
                 rm -f "$old_exe" "${old_exe}.blockmap"
               done
             else
-              echo "No older archives to prune (found ${#EXE_FILES[@]} archives)."
+              echo "No older archives to prune (found $COUNT archives)."
             fi
-            shopt -u nullglob
 
       - name: Upload release artifacts to staging
         uses: appleboy/scp-action@v1
