@@ -52,6 +52,20 @@ export interface UnauthorizedModalData {
   reason?: string;
 }
 
+export interface ActivityNotification {
+  id: string;
+  type: 'mention' | 'missed';
+  messageId: string;
+  conversationId: string;
+  conversationName: string;
+  senderId: string;
+  senderName: string;
+  senderHandle: string;
+  content: string;
+  timestamp: string;
+  isRead?: boolean;
+}
+
 interface ChatContextType {
   currentUser: User;
   users: User[];
@@ -89,8 +103,12 @@ interface ChatContextType {
   sidebarMobileOpen: boolean;
   isAuthenticated: boolean;
 
-  theme: 'whatsapp' | 'slate' | 'nordic';
-  setTheme: (theme: 'whatsapp' | 'slate' | 'nordic') => void;
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
+  themePreset: string;
+  setThemePreset: (preset: string) => void;
+  chatGradient: 'cobalt' | 'midnight' | 'emerald' | 'none';
+  setChatGradient: (gradient: 'cobalt' | 'midnight' | 'emerald' | 'none') => void;
 
   // Setters / UI actions
   setActiveConversationId: (id: string) => void;
@@ -126,6 +144,7 @@ interface ChatContextType {
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
   togglePinMessage: (messageId: string) => Promise<void>;
   updateUserStatus: (status: UserStatus, customStatus?: string) => void;
+  setUserPresenceStatus: (status: UserStatus) => void;
   createOrOpenDm: (targetUserId: string) => void;
 
   // Admin Actions (strictly RBAC checked)
@@ -151,6 +170,23 @@ interface ChatContextType {
   openQuickReply: (data: Omit<QuickReplyState, 'isOpen'>) => void;
   closeQuickReply: () => void;
   sendQuickReply: (conversationId: string, content: string, silent?: boolean) => Promise<void>;
+
+  // Activity / Mentions Drawer
+  activityDrawerOpen: boolean;
+  setActivityDrawerOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  activityNotifications: ActivityNotification[];
+  dismissNotification: (id: string) => void;
+  clearAllNotifications: () => void;
+
+  // Customization & Appearance
+  fontSize: 'small' | 'medium' | 'large';
+  setFontSize: (size: 'small' | 'medium' | 'large') => void;
+  hideScrollbars: boolean;
+  setHideScrollbars: (hide: boolean) => void;
+  bannerPreset: string;
+  setBannerPreset: (preset: string) => void;
+  customBannerUrl: string;
+  setCustomBannerUrl: (url: string) => void;
 }
 
 const STORAGE_KEYS = {
@@ -280,10 +316,15 @@ function mapBackendMessage(m: any, defaultConvId: string): Message {
     }
   }
 
-  // Format attachments
+  // Format attachments safely
   const currentToken = getStoredToken();
   const tokenParam = currentToken ? `?token=${encodeURIComponent(currentToken)}` : '';
-  const attachments: Attachment[] = (m.attachments || []).map((att: any) => {
+  const rawAttList: any[] = Array.isArray(m.attachments)
+    ? m.attachments
+    : typeof m.attachments === 'string'
+    ? (() => { try { const p = JSON.parse(m.attachments); return Array.isArray(p) ? p : []; } catch { return []; } })()
+    : [];
+  const attachments: Attachment[] = rawAttList.map((att: any) => {
     const rawId = String(att.id || '');
     const serverBase = getServerBaseUrl() || (typeof window !== 'undefined' && window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000');
     
@@ -383,6 +424,68 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useState<NotificationPermissionStatus>(() => getDesktopNotificationPermission());
 
   const [notificationSettingsModalOpen, setNotificationSettingsModalOpen] = useState(false);
+  const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('chat_dismissed_notifications_v1') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedNotificationIds(prev => {
+      const next = [...prev, id];
+      try {
+        localStorage.setItem('chat_dismissed_notifications_v1', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const [fontSize, setFontSizeState] = useState<'small' | 'medium' | 'large'>(() => {
+    return (localStorage.getItem('chat_font_size') as any) || 'medium';
+  });
+
+  const setFontSize = useCallback((size: 'small' | 'medium' | 'large') => {
+    setFontSizeState(size);
+    localStorage.setItem('chat_font_size', size);
+    document.documentElement.setAttribute('data-font-size', size);
+  }, []);
+
+  const [hideScrollbars, setHideScrollbarsState] = useState<boolean>(() => {
+    return localStorage.getItem('chat_hide_scrollbars') === 'true';
+  });
+
+  const setHideScrollbars = useCallback((hide: boolean) => {
+    setHideScrollbarsState(hide);
+    localStorage.setItem('chat_hide_scrollbars', String(hide));
+    document.documentElement.setAttribute('data-hide-scrollbar', String(hide));
+  }, []);
+
+  const [bannerPreset, setBannerPresetState] = useState<string>(() => {
+    return localStorage.getItem('chat_banner_preset') || 'navy-mesh';
+  });
+
+  const setBannerPreset = useCallback((preset: string) => {
+    setBannerPresetState(preset);
+    localStorage.setItem('chat_banner_preset', preset);
+  }, []);
+
+  const [customBannerUrl, setCustomBannerUrlState] = useState<string>(() => {
+    return localStorage.getItem('chat_custom_banner_url') || '';
+  });
+
+  const setCustomBannerUrl = useCallback((url: string) => {
+    setCustomBannerUrlState(url);
+    localStorage.setItem('chat_custom_banner_url', url);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font-size', fontSize);
+    document.documentElement.setAttribute('data-hide-scrollbar', String(hideScrollbars));
+  }, [fontSize, hideScrollbars]);
+
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => {
     try {
       const saved = localStorage.getItem('chat_notification_prefs_v1');
@@ -409,6 +512,73 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return next;
     });
   }, []);
+
+  const activityNotifications = useMemo<ActivityNotification[]>(() => {
+    const currUser = users.find(u => u.id === currentUserId);
+    if (!currUser) return [];
+    const dismissedSet = new Set(dismissedNotificationIds);
+    const results: ActivityNotification[] = [];
+
+    const myHandle = currUser.handle ? `@${currUser.handle.toLowerCase()}` : '';
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.senderId === currUser.id || msg.isDeleted) continue;
+      if (dismissedSet.has(msg.id)) continue;
+
+      const isDm = msg.conversationId.startsWith('dm-');
+      const lowerContent = (msg.content || '').toLowerCase();
+      // Mentions only apply to non-DM channel messages; broadcast mentions never trigger in 1:1 DMs
+      const isMention = !isDm && Boolean(
+        (myHandle && lowerContent.includes(myHandle)) ||
+        lowerContent.includes('@everyone') ||
+        (currUser.role === 'main_admin' && lowerContent.includes('@admin'))
+      );
+
+      const convUnreads = unreadCounts[msg.conversationId] || 0;
+      const isUnread = !msg.readAt && convUnreads > 0;
+
+      if (isMention || isUnread) {
+        const sender = users.find(u => u.id === msg.senderId);
+        let convName = msg.conversationId;
+        if (msg.conversationId.startsWith('dm-')) {
+          convName = sender ? sender.name : 'Direct Message';
+        } else {
+          const chan = channels.find(c => c.id === msg.conversationId);
+          convName = chan ? `#${chan.name}` : msg.conversationId;
+        }
+
+        results.push({
+          id: msg.id,
+          type: isMention ? 'mention' : 'missed',
+          messageId: msg.id,
+          conversationId: msg.conversationId,
+          conversationName: convName,
+          senderId: msg.senderId,
+          senderName: sender?.name || 'Colleague',
+          senderHandle: sender?.handle || 'user',
+          content: msg.content || (msg.attachments?.length ? 'Shared an attachment' : ''),
+          timestamp: msg.timestamp,
+          isRead: Boolean(msg.readAt)
+        });
+      }
+
+      if (results.length >= 40) break;
+    }
+
+    return results;
+  }, [messages, currentUserId, users, unreadCounts, channels, dismissedNotificationIds]);
+
+  const clearAllNotifications = useCallback(() => {
+    const allIds = activityNotifications.map(n => n.id);
+    setDismissedNotificationIds(prev => {
+      const next = Array.from(new Set([...prev, ...allIds]));
+      try {
+        localStorage.setItem('chat_dismissed_notifications_v1', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [activityNotifications]);
 
   const [quickReplyState, setQuickReplyState] = useState<QuickReplyState>({
     isOpen: false,
@@ -804,13 +974,52 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
 
-  const [theme, setThemeState] = useState<'whatsapp' | 'slate' | 'nordic'>(() => {
-    return (localStorage.getItem('chat_theme') as any) || 'nordic';
+  const [theme, setThemeState] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('chat_theme');
+    if (saved === 'light') return 'light';
+    return 'dark';
   });
 
-  const setTheme = useCallback((t: 'whatsapp' | 'slate' | 'nordic') => {
-    setThemeState(t);
-    localStorage.setItem('chat_theme', t);
+  const [themePreset, setThemePresetState] = useState<string>(() => {
+    const saved = localStorage.getItem('chat_theme_preset');
+    if (saved) return saved;
+    const savedTheme = localStorage.getItem('chat_theme');
+    return savedTheme === 'light' ? 'oceanic_corporate' : 'dark_cyber_indigo';
+  });
+
+  const setTheme = useCallback((t: 'dark' | 'light' | string) => {
+    const next = t === 'light' ? 'light' : 'dark';
+    setThemeState(next);
+    localStorage.setItem('chat_theme', next);
+    setThemePresetState(current => {
+      const isLightPreset = ['oceanic_corporate', 'natural_executive', 'luxury_plum', 'midnight_cyber'].includes(current);
+      if (next === 'light' && !isLightPreset) {
+        localStorage.setItem('chat_theme_preset', 'oceanic_corporate');
+        return 'oceanic_corporate';
+      } else if (next === 'dark' && isLightPreset) {
+        localStorage.setItem('chat_theme_preset', 'dark_cyber_indigo');
+        return 'dark_cyber_indigo';
+      }
+      return current;
+    });
+  }, []);
+
+  const setThemePreset = useCallback((preset: string) => {
+    setThemePresetState(preset);
+    localStorage.setItem('chat_theme_preset', preset);
+    const isLightPreset = ['oceanic_corporate', 'natural_executive', 'luxury_plum', 'midnight_cyber'].includes(preset);
+    const targetTheme = isLightPreset ? 'light' : 'dark';
+    setThemeState(targetTheme);
+    localStorage.setItem('chat_theme', targetTheme);
+  }, []);
+
+  const [chatGradient, setChatGradientState] = useState<'cobalt' | 'midnight' | 'emerald' | 'none'>(() => {
+    return (localStorage.getItem('chat_gradient') as any) || 'cobalt';
+  });
+
+  const setChatGradient = useCallback((g: 'cobalt' | 'midnight' | 'emerald' | 'none') => {
+    setChatGradientState(g);
+    localStorage.setItem('chat_gradient', g);
   }, []);
 
   const presenceMapRef = useRef<Record<string, string>>({});
@@ -1143,6 +1352,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 8000);
 
+    socket.on('user:profile_updated', (data: { id: number; name?: string; banner_url?: string; avatar_url?: string }) => {
+      if (!data || !data.id) return;
+      const targetUserId = `usr_${data.id}`;
+      setUsers(prev =>
+        prev.map(u => {
+          if (u.id === targetUserId || u.id === String(data.id)) {
+            return { ...u, banner_url: data.banner_url, avatar_url: data.avatar_url };
+          }
+          return u;
+        })
+      );
+    });
 
     socket.on('presence:update', (data: { online_user_ids: number[]; presence: Record<string, string> }) => {
       if (data && data.presence) {
@@ -1156,11 +1377,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
               data.online_user_ids.includes(numericId as any)
             );
             const isSelf = u.id === currentUserIdRef.current;
+            const manualOverride = isSelf ? localStorage.getItem('chat_manual_status') : null;
 
             let mappedStatus: UserStatus = 'offline';
-            if (rawStatus === 'busy') {
+            if (manualOverride === 'busy') {
               mappedStatus = 'busy';
-            } else if (rawStatus === 'online' || isOnlineById || isSelf) {
+            } else if (manualOverride === 'offline') {
+              mappedStatus = 'offline';
+            } else if (rawStatus === 'busy') {
+              mappedStatus = 'busy';
+            } else if (rawStatus === 'online' || isOnlineById || (isSelf && manualOverride !== 'offline')) {
               mappedStatus = 'online';
             }
 
@@ -1874,7 +2100,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Send Message with REST API + Socket broadcast + persistent send-failure durability
   const sendMessage = useCallback(async (content: string, attachments?: Attachment[], replyToId?: string, format?: FormattingFormat) => {
-    if (!content.trim() && (!attachments || attachments.length === 0)) return;
+    const safeAttachments: Attachment[] = Array.isArray(attachments)
+      ? attachments
+      : typeof attachments === 'string'
+      ? (() => { try { const p = JSON.parse(attachments); return Array.isArray(p) ? p : []; } catch { return []; } })()
+      : [];
+
+    if (!content.trim() && safeAttachments.length === 0) return;
 
     const trimmed = content.trim();
     const hasBold = /\*\*.*?\*\*|__.*?__/.test(trimmed);
@@ -1894,7 +2126,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       format: format || 'markdown',
       formatting: { hasBold, hasItalic, hasStrikethrough, hasCode, hasQuote },
       timestamp: new Date().toISOString(),
-      attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      attachments: safeAttachments.length > 0 ? safeAttachments : undefined,
       reactions: {},
       replyToId: replyToId || (activeThreadMessageId ? activeThreadMessageId : undefined)
     };
@@ -1924,7 +2156,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         teamName = getTeamNameFromConversationId(channels, activeConversationId);
       }
 
-      const rawFileAttachments = (attachments || []).filter(a => a.rawFile);
+      const rawFileAttachments = safeAttachments.filter(a => a.rawFile);
       if (rawFileAttachments.length > 0) {
         try {
           for (let i = 0; i < rawFileAttachments.length; i++) {
@@ -2040,8 +2272,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         teamName = getTeamNameFromConversationId(channels, target.conversationId);
       }
 
+      const safeTargetAttachments: Attachment[] = Array.isArray(target.attachments)
+        ? target.attachments
+        : typeof target.attachments === 'string'
+        ? (() => { try { const p = JSON.parse(target.attachments); return Array.isArray(p) ? p : []; } catch { return []; } })()
+        : [];
+
       // 1. If message has raw file attachments that need upload:
-      const rawFileAttachments = (target.attachments || []).filter(a => a.rawFile);
+      const rawFileAttachments = safeTargetAttachments.filter(a => a.rawFile);
       if (rawFileAttachments.length > 0) {
         for (let i = 0; i < rawFileAttachments.length; i++) {
           const fileAtt = rawFileAttachments[i];
@@ -2071,7 +2309,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. If message has no raw file and content is empty:
       if (!target.content?.trim()) {
-        const errDesc = (target.attachments && target.attachments.length > 0)
+        const errDesc = safeTargetAttachments.length > 0
           ? 'Attachment file cache expired. Please re-attach the file to send.'
           : 'Message content cannot be empty.';
         updatePendingMessageStatus(clientId, 'failed', errDesc);
@@ -2094,7 +2332,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         recipient_id: recipientId,
         format: msgFormat,
         reply_to_id: numericReplyTo ? String(numericReplyTo) : undefined,
-        attachment_ids: target.attachments?.map(a => a.id)
+        attachment_ids: safeTargetAttachments.map(a => a.id)
       });
 
       if (res && res.id) {
@@ -2261,21 +2499,104 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [addToast]);
 
-  // Update Status
+  // Update Status & Manual Override
   const updateUserStatus = useCallback((status: UserStatus, customStatus?: string) => {
+    localStorage.setItem('chat_manual_status', status);
     setUsers(prev =>
       prev.map(u =>
         u.id === currentUser.id
-          ? { ...u, status, customStatus: customStatus !== undefined ? customStatus : u.customStatus }
+          ? { ...u, status, presence: status, customStatus: customStatus !== undefined ? customStatus : u.customStatus }
           : u
       )
     );
 
     const socket = getSocket();
-    if (socket) {
+    if (socket && socket.connected) {
       socket.emit('presence_set_status', { status });
     }
   }, [currentUser.id]);
+
+  const setUserPresenceStatus = updateUserStatus;
+
+  // Auto-presence & activity detection (auto online, auto offline on idle/blur)
+  useEffect(() => {
+    let idleTimer: NodeJS.Timeout | null = null;
+    const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+    const setOnlineIfAllowed = () => {
+      const manual = localStorage.getItem('chat_manual_status');
+      if (manual === 'busy' || manual === 'offline') return;
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        socket.emit('presence_set_status', { status: 'online' });
+      }
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === currentUserIdRef.current ? { ...u, status: 'online', presence: 'online' } : u
+        )
+      );
+    };
+
+    const setOfflineIfAllowed = () => {
+      const manual = localStorage.getItem('chat_manual_status');
+      if (manual === 'busy') return; // Do not override busy with offline
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        socket.emit('presence_set_status', { status: 'offline' });
+      }
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === currentUserIdRef.current ? { ...u, status: 'offline', presence: 'offline' } : u
+        )
+      );
+    };
+
+    const resetIdleTimer = () => {
+      setOnlineIfAllowed();
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setOfflineIfAllowed();
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resetIdleTimer();
+      } else {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          setOfflineIfAllowed();
+        }, 60000); // 1 minute after hiding tab
+      }
+    };
+
+    const handleFocus = () => resetIdleTimer();
+    const handleBlur = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setOfflineIfAllowed();
+      }, 60000);
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('mousemove', resetIdleTimer, { passive: true });
+    window.addEventListener('keydown', resetIdleTimer, { passive: true });
+    window.addEventListener('touchstart', resetIdleTimer, { passive: true });
+
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('keydown', resetIdleTimer);
+      window.removeEventListener('touchstart', resetIdleTimer);
+    };
+  }, []);
 
   // Create or Open DM
   const createOrOpenDm = useCallback((targetUserId: string) => {
@@ -2511,6 +2832,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated,
         theme,
         setTheme,
+        themePreset,
+        setThemePreset,
+        chatGradient,
+        setChatGradient,
         teamDirectories,
 
         setActiveConversationId,
@@ -2542,6 +2867,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleReaction,
         togglePinMessage,
         updateUserStatus,
+        setUserPresenceStatus,
         createOrOpenDm,
 
         createUser,
@@ -2563,7 +2889,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         quickReplyState,
         openQuickReply,
         closeQuickReply,
-        sendQuickReply
+        sendQuickReply,
+
+        activityDrawerOpen,
+        setActivityDrawerOpen,
+        activityNotifications,
+        dismissNotification,
+        clearAllNotifications,
+
+        fontSize,
+        setFontSize,
+        hideScrollbars,
+        setHideScrollbars,
+        bannerPreset,
+        setBannerPreset,
+        customBannerUrl,
+        setCustomBannerUrl
       }}
     >
       {children}

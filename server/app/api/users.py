@@ -1,6 +1,7 @@
 from typing import List
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_, desc, func, case
 from ..core.database import get_db
@@ -106,6 +107,8 @@ def get_colleagues(
             is_main_admin=user.is_main_admin,
             team=user.team,
             is_team_leader=user.is_team_leader,
+            banner_url=user.banner_url,
+            avatar_url=user.avatar_url,
             account_status=user_account_status,
             is_active=is_active,
             presence=current_presence,
@@ -123,3 +126,169 @@ def get_colleagues(
         reverse=True
     )
     return results
+
+
+@router.get("/me", response_model=UserRecentOut)
+def get_me(
+    current_user: User = Depends(get_current_user)
+):
+    """Returns profile for currently authenticated user."""
+    is_user_online = bool(current_user.id in online_users and len(online_users[current_user.id]) > 0)
+    current_presence = user_presence_status.get(current_user.id, "online") if is_user_online else "offline"
+    user_account_status = getattr(current_user, "account_status", current_user.status)
+
+    return UserRecentOut(
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        is_main_admin=current_user.is_main_admin,
+        team=current_user.team,
+        is_team_leader=current_user.is_team_leader,
+        banner_url=current_user.banner_url,
+        avatar_url=current_user.avatar_url,
+        account_status=user_account_status,
+        is_active=True,
+        presence=current_presence,
+        status=current_presence,
+        created_at=current_user.created_at,
+        unread_count=0,
+        is_online=is_user_online
+    )
+
+
+@router.post("/me/banner", response_model=UserRecentOut)
+async def upload_user_banner(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Uploads a customized user profile banner (JPEG, PNG, WEBP, GIF; max 10MB)."""
+    import os
+    import uuid
+    import aiofiles
+    from fastapi import HTTPException
+    from ..core.config import settings
+    from ..sockets.manager import sio
+
+    # Validate file format and size
+    ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image format. Allowed formats: JPEG, PNG, WEBP, GIF.")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Banner file exceeds maximum size limit of 10MB.")
+
+    # Deep magic-byte verification (zero trust on client-supplied Content-Type header)
+    if content.startswith(b"MZ") or content.startswith(b"\x7fELF") or content.startswith(b"#!\n") or content.startswith(b"#!/"):
+        raise HTTPException(status_code=400, detail="Executable and script file content is strictly prohibited.")
+
+    import filetype
+    kind = filetype.guess(content)
+    if not kind or kind.mime not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="File content does not match a valid image format (JPEG, PNG, WEBP, GIF).")
+
+    # Storage directory: uploads/banners
+    banners_dir = os.path.join(settings.UPLOAD_DIR, "banners")
+    os.makedirs(banners_dir, exist_ok=True)
+
+    # Server-generated extension from verified magic bytes
+    ext = f".{kind.extension}" if kind and kind.extension else ".png"
+    if ext == ".jpeg":
+        ext = ".jpg"
+
+    filename = f"banner_{current_user.id}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(banners_dir, filename)
+
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
+
+    # Save relative API path (consistent with API_V1_STR prefix: /api/users/banner/)
+    banner_url = f"{settings.API_V1_STR}/users/banner/{filename}"
+    current_user.banner_url = banner_url
+    db.commit()
+    db.refresh(current_user)
+
+    # Broadcast real-time profile update to all connected clients
+    try:
+        await sio.emit("user:profile_updated", {
+            "id": current_user.id,
+            "name": current_user.name,
+            "banner_url": current_user.banner_url,
+            "avatar_url": current_user.avatar_url
+        })
+    except Exception:
+        pass
+
+    return get_me(current_user=current_user)
+
+
+@router.delete("/me/banner", response_model=UserRecentOut)
+async def remove_user_banner(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Removes user custom banner and resets to default."""
+    import os
+    from ..core.config import settings
+    from ..sockets.manager import sio
+
+    if current_user.banner_url and "/users/banner/" in current_user.banner_url:
+        safe_fname = os.path.basename(current_user.banner_url.split("/users/banner/")[-1])
+        fpath = os.path.join(settings.UPLOAD_DIR, "banners", safe_fname)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except OSError:
+                pass
+
+    current_user.banner_url = None
+    db.commit()
+    db.refresh(current_user)
+
+    try:
+        await sio.emit("user:profile_updated", {
+            "id": current_user.id,
+            "name": current_user.name,
+            "banner_url": None,
+            "avatar_url": current_user.avatar_url
+        })
+    except Exception:
+        pass
+
+    return get_me(current_user=current_user)
+
+
+@router.get("/banner/{filename}")
+def serve_user_banner(filename: str):
+    """Serves uploaded user banner images with client-side caching."""
+    import os
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+    from ..core.config import settings
+
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join(settings.UPLOAD_DIR, "banners", safe_filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Banner image not found")
+
+    ext = os.path.splitext(safe_filename)[1].lower()
+    media_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif"
+    }
+    media_type = media_map.get(ext, "image/png")
+
+    return FileResponse(
+        path=filepath,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Content-Type-Options": "nosniff"
+        }
+    )
+

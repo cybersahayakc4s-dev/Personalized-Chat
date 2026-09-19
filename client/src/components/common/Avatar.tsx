@@ -10,10 +10,10 @@ interface AvatarProps {
 }
 
 const statusColors: Record<UserStatus, string> = {
-  online: 'bg-emerald-500 ring-1 ring-slate-900',
-  away: 'bg-amber-500 ring-1 ring-slate-900',
-  busy: 'bg-amber-400 ring-1 ring-slate-900',
-  offline: 'bg-slate-500/80 ring-1 ring-slate-900'
+  online: 'bg-emerald-500 ring-2 ring-canvas shadow-xs',
+  away: 'bg-amber-500 ring-2 ring-canvas',
+  busy: 'bg-rose-500 ring-2 ring-canvas',
+  offline: 'bg-slate-400 dark:bg-zinc-500 ring-2 ring-canvas'
 };
 
 export const Avatar: React.FC<AvatarProps> = ({
@@ -32,7 +32,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     .toUpperCase() || '?';
 
   const sizeClasses = {
-    xs: 'w-5 h-5 text-[9px]',
+    xs: 'w-5 h-5 text-xs',
     sm: 'w-7 h-7 text-xs',
     md: 'w-9 h-9 text-xs',
     lg: 'w-10 h-10 text-sm',
@@ -47,9 +47,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     xl: 'w-3 h-3 bottom-0.5 right-0.5'
   };
 
-  // System-picked deterministic color profile for this individual user
-  const colorProfile = getUserColorProfile(user?.id, safeName);
-  const userStyle = `${colorProfile.bg} ${colorProfile.text} border ${colorProfile.border}`;
+  const palette = getUserColorProfile(user?.id, user?.name);
 
   return (
     <div className={`relative inline-flex flex-shrink-0 select-none ${className}`}>
@@ -57,12 +55,13 @@ export const Avatar: React.FC<AvatarProps> = ({
         <img
           src={user.avatarUrl}
           alt={safeName}
-          className={`${sizeClasses[size]} rounded-full object-cover border border-slate-700/50 shadow-xs`}
+          className={`${sizeClasses[size]} rounded-full object-cover border border-subtle shadow-xs`}
           referrerPolicy="no-referrer"
         />
       ) : (
         <div
-          className={`${sizeClasses[size]} rounded-full ${userStyle} font-medium flex items-center justify-center tracking-wider shadow-xs`}
+          className={`${sizeClasses[size]} rounded-full font-medium flex items-center justify-center tracking-wider shadow-xs`}
+          style={{ background: palette.bg, color: palette.text, border: `1px solid ${palette.border}` }}
         >
           {initials}
         </div>

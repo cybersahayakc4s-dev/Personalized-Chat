@@ -1,22 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { TeamId, User, Message } from '../../types';
-import { TEAMS_META } from '../../data/initialData';
 import { getDayKey, formatSidebarTime } from '../../utils/date';
-import { ChevronLeft, ChevronRight, Clock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, AlertCircle, Sparkles } from 'lucide-react';
 
 interface TeamItem {
   id: TeamId;
   name: string;
-  dotColor: string;
 }
 
 const TEAMS_LIST: TeamItem[] = [
-  { id: 'team_ai', name: 'AI Team', dotColor: '#6366f1' },
-  { id: 'team_legal', name: 'Legal', dotColor: '#f59e0b' },
-  { id: 'seo', name: 'SEO & Growth', dotColor: '#06b6d4' },
-  { id: 'coordination', name: 'Coordination', dotColor: '#f43f5e' },
-  { id: 'hr_admin', name: 'HR & Admin', dotColor: '#10b981' },
+  { id: 'team_ai', name: 'AI Team' },
+  { id: 'team_legal', name: 'Legal' },
+  { id: 'seo', name: 'SEO & Growth' },
+  { id: 'coordination', name: 'Coordination' },
+  { id: 'hr_admin', name: 'HR & Admin' },
 ];
 
 export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = ({ onOpenScheduler }) => {
@@ -24,11 +22,9 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
     messages = [],
     users = [],
     setActiveConversationId,
-    setHighlightedMessageId,
-    theme
+    setHighlightedMessageId
   } = useChat() as any;
 
-  const isDark = theme !== 'nordic';
   const [currentIndex, setCurrentIndex] = useState(0);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
 
@@ -97,18 +93,18 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
   };
 
   return (
-    <div className="mx-2 mb-3 p-2.5 rounded-xl border transition-colors select-none bg-[#101726] border-slate-800/90 shadow-sm">
-      {/* Header: Title + Counter + Alarm Clock Schedule Button */}
-      <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-800/80">
+    <div className="mx-2 mb-3 p-2.5 rounded-lg border transition-colors select-none bg-surface border-subtle">
+      {/* Header: Title + Counter + Schedule Button */}
+      <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-subtle">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-          <span className="font-semibold text-xs text-white tracking-tight truncate">
+          <Sparkles className="h-3.5 w-3.5 text-secondary shrink-0" />
+          <span className="font-semibold text-xs text-primary tracking-tight truncate">
             Team Updates
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs font-mono font-medium px-1.5 py-0.5 rounded bg-sidebar-active text-secondary border border-sidebar-border">
             {postedCount}/{TEAMS_LIST.length} posted
           </span>
 
@@ -119,10 +115,11 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
                 e.stopPropagation();
                 onOpenScheduler();
               }}
-              className="p-1 rounded text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition cursor-pointer"
+              className="p-1 rounded text-secondary hover:text-primary hover:bg-sidebar-hover transition-colors cursor-pointer"
               title="Schedule daily update request"
+              aria-label="Schedule daily update request"
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -131,60 +128,60 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
       {/* Team Card Content */}
       <div
         onClick={handleCardClick}
-        className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+        className={`p-2.5 rounded-md border transition-colors cursor-pointer ${
           updateData
-            ? 'bg-[#152033] border-blue-500/30 hover:border-blue-400 hover:bg-[#18253c]'
-            : 'bg-slate-900/50 border-slate-800/60 hover:bg-slate-900/80'
+            ? 'bg-sidebar-active border-sidebar-border hover:border-focus'
+            : 'bg-sidebar border-sidebar-border hover:bg-sidebar-hover'
         }`}
       >
         <div className="flex items-center justify-between gap-2 mb-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: currentTeam.dotColor }}
+              className={`h-2 w-2 rounded-full shrink-0 ${updateData ? 'bg-primary' : 'bg-muted'}`}
             />
-            <span className="font-semibold text-xs text-slate-200 truncate">
+            <span className="font-semibold text-xs text-primary truncate">
               {updateData?.author ? `${updateData.author.name} — ` : ''}{currentTeam.name}
             </span>
           </div>
 
-          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+          <span className="text-xs font-mono text-muted shrink-0">
             {updateData ? formatSidebarTime(updateData.message.timestamp) : 'Pending'}
           </span>
         </div>
 
         {updateData ? (
           <div>
-            <p className={`text-xs text-slate-300 leading-relaxed font-sans ${isExpanded ? '' : 'line-clamp-2'}`}>
+            <p className={`text-xs text-secondary leading-relaxed font-sans ${isExpanded ? '' : 'line-clamp-2'}`}>
               {updateData.message.content || '[Attachment update posted]'}
             </p>
             {updateData.message.content && updateData.message.content.length > 80 && (
               <button
                 type="button"
                 onClick={toggleExpand}
-                className="mt-1 text-[10.5px] font-medium text-blue-400 hover:text-blue-300 transition cursor-pointer block"
+                className="mt-1 text-xs font-medium text-primary hover:underline transition-colors cursor-pointer block"
               >
                 {isExpanded ? 'Show less' : 'Show more'}
               </button>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 py-1 text-slate-500 italic text-[11px] font-mono">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <div className="flex items-center gap-1.5 py-1 text-muted italic text-xs font-mono">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>No updates posted today</span>
           </div>
         )}
       </div>
 
-      {/* Carousel Controls: Previous Arrow, Color-coded Dots, Next Arrow */}
+      {/* Carousel Controls: Previous Arrow, Dots, Next Arrow */}
       <div className="flex items-center justify-between gap-2 mt-2 pt-1">
         <button
           type="button"
           onClick={handlePrev}
-          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          className="p-1 rounded text-secondary hover:text-primary hover:bg-sidebar-hover transition-colors cursor-pointer"
           title="Previous team"
+          aria-label="Previous team"
         >
-          <ChevronLeft className="w-3.5 h-3.5" />
+          <ChevronLeft className="h-3.5 w-3.5" />
         </button>
 
         {/* Dot Indicators */}
@@ -200,14 +197,13 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
                   e.stopPropagation();
                   setCurrentIndex(idx);
                 }}
-                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                  isSelected ? 'ring-2 ring-white/60 scale-125' : 'hover:opacity-80'
+                className={`h-2 w-2 rounded-full transition-all cursor-pointer ${
+                  hasPosted ? 'bg-primary' : 'bg-transparent border border-focus'
+                } ${
+                  isSelected ? 'ring-2 ring-focus scale-125' : 'hover:opacity-80'
                 }`}
-                style={{
-                  backgroundColor: hasPosted ? team.dotColor : 'transparent',
-                  border: hasPosted ? 'none' : '1px solid #475569'
-                }}
                 title={`${team.name}: ${hasPosted ? 'Posted today' : 'No update today'}`}
+                aria-label={`${team.name}: ${hasPosted ? 'Posted today' : 'No update today'}`}
               />
             );
           })}
@@ -216,10 +212,11 @@ export const TeamUpdatesCarousel: React.FC<{ onOpenScheduler?: () => void }> = (
         <button
           type="button"
           onClick={handleNext}
-          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          className="p-1 rounded text-secondary hover:text-primary hover:bg-sidebar-hover transition-colors cursor-pointer"
           title="Next team"
+          aria-label="Next team"
         >
-          <ChevronRight className="w-3.5 h-3.5" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

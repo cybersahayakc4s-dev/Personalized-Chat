@@ -67,30 +67,30 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-md rounded-2xl bg-[var(--surface-card,#18181b)] border border-[var(--border-medium,#27272a)] p-6 shadow-2xl text-[var(--text-primary,#fafafa)] transition-all animate-in zoom-in-95 duration-150"
+        className="w-full max-w-md rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-2xl text-[var(--text-primary)] transition-all animate-in zoom-in-95 duration-150"
       >
         <div className="flex items-start gap-3.5 mb-4">
           <div
-            className={`p-2.5 rounded-xl flex-shrink-0 ${
+            className={`p-2.5 rounded-xl shrink-0 ${
               isDestructive
-                ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                ? 'bg-surface-hover text-danger border border-subtle'
+                : 'bg-accent-muted text-accent border border-subtle'
             }`}
           >
             {isDestructive ? <AlertTriangle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 id="confirm-dialog-title" className="text-base font-semibold tracking-tight text-[var(--text-primary,#fafafa)]">
+            <h3 id="confirm-dialog-title" className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
               {title}
             </h3>
-            <div id="confirm-dialog-description" className="mt-1.5 text-sm text-[var(--text-secondary,#a1a1aa)] leading-relaxed">
+            <div id="confirm-dialog-description" className="mt-1.5 text-sm text-[var(--text-secondary)] leading-relaxed">
               {description}
             </div>
           </div>
           <button
             onClick={onCancel}
             data-dialog-action="cancel"
-            className="p-1 rounded-lg text-[var(--text-muted,#71717a)] hover:text-[var(--text-primary,#fafafa)] hover:bg-[var(--surface-hover,#27272a)] transition-colors"
+            className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
@@ -103,7 +103,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             data-dialog-action="cancel"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--border-medium,#27272a)] bg-[var(--surface-card,#18181b)] hover:bg-[var(--surface-hover,#27272a)] text-[var(--text-secondary,#a1a1aa)] hover:text-[var(--text-primary,#fafafa)] transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 cursor-pointer"
           >
             {cancelLabel}
           </button>
@@ -113,11 +113,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             data-dialog-action="confirm"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-sm font-medium rounded-xl transition-all shadow-sm flex items-center gap-2 ${
+            className={`px-4 py-2 text-sm font-medium rounded-xl transition-all shadow-xs flex items-center gap-2 ${
               isDestructive
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
-                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                ? 'bg-danger hover:brightness-110 text-white'
+                : 'bg-accent hover:bg-accent-hover text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer`}
           >
             {isLoading && (
               <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

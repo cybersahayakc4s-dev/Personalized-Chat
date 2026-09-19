@@ -18,16 +18,29 @@ def init_db():
     # Ensure tables exist (Alembic handles migrations)
     Base.metadata.create_all(bind=engine)
 
-    # Auto-migrate newly added columns for SQLite/dev databases
+    # Auto-migrate newly added columns for SQLite and PostgreSQL databases
     try:
         with engine.connect() as conn:
             if settings.DATABASE_URL.startswith("sqlite"):
-                cols = [row[1] for row in conn.execute(text("PRAGMA table_info(workspace_settings)")).fetchall()]
-                if "allow_custom_channels" not in cols:
+                # 1. workspace_settings columns
+                ws_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(workspace_settings)")).fetchall()]
+                if "allow_custom_channels" not in ws_cols:
                     conn.execute(text("ALTER TABLE workspace_settings ADD COLUMN allow_custom_channels BOOLEAN NOT NULL DEFAULT 0"))
                     conn.commit()
+
+                # 2. users columns (banner_url, avatar_url)
+                u_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
+                if "banner_url" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)"))
+                    conn.commit()
+                if "avatar_url" not in u_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)"))
+                    conn.commit()
             else:
+                # PostgreSQL path with IF NOT EXISTS
                 conn.execute(text("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS allow_custom_channels BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url VARCHAR(512)"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512)"))
                 conn.commit()
     except Exception as mig_err:
         logger.warning(f"Auto-migration check notice: {mig_err}")

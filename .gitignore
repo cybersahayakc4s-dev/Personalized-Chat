@@ -7,7 +7,7 @@
 
 # Local Persistent Data & Backups (Protected from Git Operations)
 backups/
-/data/
+data/
 *.sql
 *.sql.gz
 *.tar.gz
@@ -28,7 +28,7 @@ server/uploads/
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 *.so
 .Python
 env/
@@ -56,6 +56,7 @@ wheels/
 node_modules/
 client/node_modules/
 client/dist/
+dist-electron/
 dist/
 npm-debug.log*
 yarn-debug.log*

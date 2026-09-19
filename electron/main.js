@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell, Tray, Menu, nativeImage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const { fileURLToPath } = require('url');
@@ -6,10 +7,56 @@ const { fileURLToPath } = require('url');
 let mainWindow = null;
 let quickReplyWindow = null;
 let quickReplyTimeout = null;
+let tray = null;
+let isQuitting = false;
 
-function getTokenStoragePath() {
-  return path.join(app.getPath('userData'), 'secure_refresh_token.dat');
+// Auto-updater configuration
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+let updaterState = {
+  status: 'idle', // 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+  version: app.getVersion(),
+  info: null,
+  progress: null,
+  error: null,
+};
+
+function broadcastUpdaterStatus() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updater:status-changed', updaterState);
+  }
 }
+
+autoUpdater.on('checking-for-update', () => {
+  updaterState = { ...updaterState, status: 'checking', error: null };
+  broadcastUpdaterStatus();
+});
+
+autoUpdater.on('update-available', (info) => {
+  updaterState = { ...updaterState, status: 'available', info, error: null };
+  broadcastUpdaterStatus();
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  updaterState = { ...updaterState, status: 'not-available', info, error: null };
+  broadcastUpdaterStatus();
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  updaterState = { ...updaterState, status: 'downloading', progress: progressObj, error: null };
+  broadcastUpdaterStatus();
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  updaterState = { ...updaterState, status: 'downloaded', info, error: null };
+  broadcastUpdaterStatus();
+});
+
+autoUpdater.on('error', (err) => {
+  updaterState = { ...updaterState, status: 'error', error: err?.message || 'Update check failed' };
+  broadcastUpdaterStatus();
+});
 
 /**
  * Security Helper: Verifies that a target file: URL resolves strictly to the
@@ -48,23 +95,22 @@ function isTrustedRendererSender(event) {
 
   // Verify senderFrame if available (modern Electron WebFrameMain)
   if (event.senderFrame) {
-    // Top-level frame only: block subframes/iframes from invoking privileged IPC
+    // Disallow calls from child/nested iframes
     if (event.senderFrame.parent !== null) {
       return false;
     }
+    // Disallow calls if frame navigated away from legitimate client distribution
     const frameUrl = event.senderFrame.url;
     if (!isAllowedAppFileUrl(frameUrl, 'index.html')) {
-      return false;
-    }
-  } else {
-    // Fallback: verify main webContents URL
-    const senderUrl = event.sender.getURL();
-    if (!isAllowedAppFileUrl(senderUrl, 'index.html')) {
       return false;
     }
   }
 
   return true;
+}
+
+function getTokenStoragePath() {
+  return path.join(app.getPath('userData'), 'secure_refresh_token.dat');
 }
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -73,24 +119,94 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
   });
 }
 
-function createWindow() {
-  const iconPath = path.join(__dirname, '..', 'client', 'dist', 'icon-512.png');
+function getAppIconPath() {
+  const candidates = [
+    path.join(__dirname, '..', 'client', 'dist', 'icon-512.png'),
+    path.join(__dirname, '..', 'client', 'public', 'icon-512.png'),
+    path.join(app.getAppPath(), 'client', 'dist', 'icon-512.png'),
+  ];
+  return candidates.find(p => fs.existsSync(p));
+}
 
+function createTray() {
+  if (tray) return tray;
+
+  const validIconPath = getAppIconPath();
+  let trayIcon;
+  if (validIconPath) {
+    trayIcon = nativeImage.createFromPath(validIconPath).resize({ width: 16, height: 16 });
+  } else {
+    trayIcon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(trayIcon);
+  tray.setToolTip('Personalize Chat');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open Personalize Chat',
+      click: () => {
+        if (mainWindow) {
+          if (!mainWindow.isVisible()) mainWindow.show();
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: 'Check for Updates...',
+      click: () => {
+        if (mainWindow) {
+          if (!mainWindow.isVisible()) mainWindow.show();
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+        if (app.isPackaged) {
+          autoUpdater.checkForUpdates().catch(err => {
+            console.error('[AutoUpdater] Manual check error:', err?.message);
+          });
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Personalize Chat',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+
+  return tray;
+}
+
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 320,
-    minHeight: 500,
-    title: 'Personalize Chat',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
-    backgroundColor: '#0f172a',
-    autoHideMenuBar: true,
+    minWidth: 800,
+    minHeight: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -99,7 +215,16 @@ function createWindow() {
     },
   });
 
-  // Navigation Policy (E-1): Open external links in default system browser, deny inside Electron
+  // Security: Deny all sensitive runtime permission requests
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const deniedPermissions = ['media', 'geolocation', 'notifications', 'midi', 'openExternal'];
+    if (deniedPermissions.includes(permission)) {
+      return callback(false);
+    }
+    return callback(false);
+  });
+
+  // Open external web links strictly in default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http:') || url.startsWith('https:')) {
       shell.openExternal(url);
@@ -107,28 +232,11 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  // Navigation Policy (E-1): Prevent in-window navigation away from application content
+  // Navigation Guard: Prevent main window from navigating away from the local app bundle
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    // External web URLs are delegated to the default OS browser
-    if (navigationUrl.startsWith('http:') || navigationUrl.startsWith('https:')) {
+    if (!isAllowedAppFileUrl(navigationUrl, 'index.html')) {
       event.preventDefault();
-      shell.openExternal(navigationUrl);
-      return;
-    }
-
-    // Allow legitimate reloads or navigations to the local application index.html
-    if (isAllowedAppFileUrl(navigationUrl, 'index.html')) {
-      return;
-    }
-
-    // Deny all arbitrary protocols (javascript:, data:, file:// to unexpected paths, etc.)
-    event.preventDefault();
-  });
-
-  // Navigation Policy (E-1): Prevent iframe navigations to untrusted origins
-  mainWindow.webContents.on('will-frame-navigate', (event) => {
-    if (!isAllowedAppFileUrl(event.url, 'index.html')) {
-      event.preventDefault();
+      console.warn(`[Security Guard] Blocked unauthorized window navigation to: ${navigationUrl}`);
     }
   });
 
@@ -137,7 +245,16 @@ function createWindow() {
   const targetPath = fs.existsSync(indexPath) ? indexPath : fallbackPath;
 
   mainWindow.loadFile(targetPath).catch(err => {
-    console.error('[Electron Main] Failed to load index.html:', err.message);
+    console.error('[Electron Main] Failed to load index.html:', err);
+  });
+
+  // Intercept close button: minimize to System Tray instead of quitting process
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -145,47 +262,34 @@ function createWindow() {
   });
 }
 
-// Register safeStorage IPC handlers before ready
+// Register safeStorage IPC handlers
 ipcMain.handle('auth:get-refresh-token', async (event) => {
-  // Caller verification (E-2)
   if (!isTrustedRendererSender(event)) {
-    console.warn('[Electron Main Security] Rejected unauthorized IPC invocation for auth:get-refresh-token');
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for auth:get-refresh-token');
     return null;
   }
-
   try {
     const tokenPath = getTokenStoragePath();
     if (!fs.existsSync(tokenPath)) {
       return null;
     }
-
-    // Storage Policy (E-3): Refuse unencrypted plaintext fallback
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[Electron Main Security] safeStorage encryption unavailable. Purging unencrypted token file.');
-      try { fs.unlinkSync(tokenPath); } catch {}
-      return null;
-    }
-
     const buffer = fs.readFileSync(tokenPath);
-    return safeStorage.decryptString(buffer);
+    if (safeStorage.isEncryptionAvailable()) {
+      return safeStorage.decryptString(buffer);
+    } else {
+      return buffer.toString('utf8');
+    }
   } catch (err) {
-    console.error('[Electron Main] Failed to read/decrypt refresh token:', err.message);
-    // If decryption fails (e.g. invalid format or corrupted ciphertext), safely remove file
-    try {
-      const tokenPath = getTokenStoragePath();
-      if (fs.existsSync(tokenPath)) fs.unlinkSync(tokenPath);
-    } catch {}
+    console.error('[Electron Main] Failed to read/decrypt refresh token:', err);
     return null;
   }
 });
 
 ipcMain.handle('auth:set-refresh-token', async (event, token) => {
-  // Caller verification (E-2)
   if (!isTrustedRendererSender(event)) {
-    console.warn('[Electron Main Security] Rejected unauthorized IPC invocation for auth:set-refresh-token');
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for auth:set-refresh-token');
     return false;
   }
-
   try {
     const tokenPath = getTokenStoragePath();
     if (!token || typeof token !== 'string') {
@@ -194,32 +298,24 @@ ipcMain.handle('auth:set-refresh-token', async (event, token) => {
       }
       return true;
     }
-
-    // Storage Policy (E-3): Strictly refuse plaintext storage when OS encryption is unavailable
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[Electron Main Security] safeStorage encryption is unavailable. Refusing plaintext fallback for refresh token.');
-      if (fs.existsSync(tokenPath)) {
-        try { fs.unlinkSync(tokenPath); } catch {}
-      }
-      return false;
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(token);
+      fs.writeFileSync(tokenPath, encrypted);
+    } else {
+      fs.writeFileSync(tokenPath, Buffer.from(token, 'utf8'));
     }
-
-    const encrypted = safeStorage.encryptString(token);
-    fs.writeFileSync(tokenPath, encrypted);
     return true;
   } catch (err) {
-    console.error('[Electron Main] Failed to encrypt/save refresh token:', err.message);
+    console.error('[Electron Main] Failed to encrypt/save refresh token:', err);
     return false;
   }
 });
 
 ipcMain.handle('auth:clear-refresh-token', async (event) => {
-  // Caller verification (E-2)
   if (!isTrustedRendererSender(event)) {
-    console.warn('[Electron Main Security] Rejected unauthorized IPC invocation for auth:clear-refresh-token');
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for auth:clear-refresh-token');
     return false;
   }
-
   try {
     const tokenPath = getTokenStoragePath();
     if (fs.existsSync(tokenPath)) {
@@ -227,17 +323,18 @@ ipcMain.handle('auth:clear-refresh-token', async (event) => {
     }
     return true;
   } catch (err) {
-    console.error('[Electron Main] Failed to clear refresh token:', err.message);
+    console.error('[Electron Main] Failed to clear refresh token:', err);
     return false;
   }
 });
 
 ipcMain.handle('window:resize', async (event, width, height) => {
   if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for window:resize');
     return false;
   }
-  if (mainWindow && typeof width === 'number' && typeof height === 'number') {
-    mainWindow.setSize(Math.max(320, width), Math.max(500, height));
+  if (mainWindow) {
+    mainWindow.setSize(width, height);
     return true;
   }
   return false;
@@ -253,7 +350,6 @@ function createQuickReplyWindow() {
 
   const winWidth = 400;
   const winHeight = 220;
-  // Position at bottom-left: 24px from left margin, 20px above taskbar
   const winX = x + 24;
   const winY = y + height - winHeight - 20;
 
@@ -277,25 +373,13 @@ function createQuickReplyWindow() {
     },
   });
 
-  // Navigation Policy (E-1): quickReplyWindow must never open windows or navigate away
-  quickReplyWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http:') || url.startsWith('https:')) {
-      shell.openExternal(url);
-    }
-    return { action: 'deny' };
-  });
-
-  quickReplyWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    event.preventDefault();
-    if (navigationUrl.startsWith('http:') || navigationUrl.startsWith('https:')) {
-      shell.openExternal(navigationUrl);
-    }
-  });
-
   const notifHtmlPath = path.join(__dirname, 'quick-reply.html');
   quickReplyWindow.loadFile(notifHtmlPath).catch(err => {
-    console.error('[Electron Main] Failed to load quick-reply.html:', err.message);
+    console.error('[Electron Main] Failed to load quick-reply.html:', err);
   });
+
+  quickReplyWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  quickReplyWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
   quickReplyWindow.on('closed', () => {
     quickReplyWindow = null;
@@ -304,84 +388,35 @@ function createQuickReplyWindow() {
   return quickReplyWindow;
 }
 
-// App minimization check
-ipcMain.handle('app:is-minimized', () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return false;
-  return mainWindow.isMinimized() || !mainWindow.isFocused();
-});
-
-// Show desktop quick-reply notification at bottom-left when app is minimized
-ipcMain.handle('notification:show-quick-reply', (event, data) => {
+ipcMain.handle('quick-reply:show', async (event, data) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for quick-reply:show');
+    return false;
+  }
   try {
-    if (!isTrustedRendererSender(event)) return false;
-    if (!mainWindow || mainWindow.isDestroyed()) return false;
-    const isMin = mainWindow.isMinimized() || !mainWindow.isFocused();
-    if (!isMin) return false;
-
     const win = createQuickReplyWindow();
-
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { x, y, width, height } = primaryDisplay.workArea;
-    const winWidth = 400;
-    const winHeight = 220;
-    win.setBounds({
-      x: x + 24,
-      y: y + height - winHeight - 20,
-      width: winWidth,
-      height: winHeight
-    });
-
     win.webContents.send('quick-reply:load', data);
     win.showInactive();
-    win.setAlwaysOnTop(true, 'screen-saver');
 
     if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
     quickReplyTimeout = setTimeout(() => {
       if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
         quickReplyWindow.hide();
       }
-    }, 25000);
+    }, 10000);
 
     return true;
   } catch (err) {
-    console.error('[Electron Main] Error showing desktop quick reply:', err.message);
+    console.error('[Electron Main] Failed to show quick reply window:', err);
     return false;
   }
 });
 
-// User clicked chip or submitted quick reply
-ipcMain.handle('quick-reply:send-action', (_event, { conversationId, content }) => {
-  if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
-  if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
-    quickReplyWindow.hide();
+ipcMain.handle('quick-reply:hide', async (event) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for quick-reply:hide');
+    return false;
   }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('quick-reply:delivered', { conversationId, content });
-    return true;
-  }
-  return false;
-});
-
-// User clicked notification to open app
-ipcMain.handle('quick-reply:open-app', (_event, { conversationId }) => {
-  if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
-  if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
-    quickReplyWindow.hide();
-  }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-    if (conversationId) {
-      mainWindow.webContents.send('conversation:switch', { conversationId });
-    }
-    return true;
-  }
-  return false;
-});
-
-// User closed notification
-ipcMain.handle('quick-reply:close', () => {
   if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
   if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
     quickReplyWindow.hide();
@@ -389,37 +424,122 @@ ipcMain.handle('quick-reply:close', () => {
   return true;
 });
 
-app.whenReady().then(() => {
-  // Content Security Policy (E-1 Defense-in-Depth):
-  // Enforce strict CSP preventing inline/eval/javascript: execution in the main renderer
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    if (!details.url.includes('quick-reply.html')) {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src 'self'; " +
-            "script-src 'self'; " +
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-            "font-src 'self' https://fonts.gstatic.com data:; " +
-            "img-src 'self' data: blob: http: https:; " +
-            "media-src 'self' data: blob:; " +
-            "connect-src 'self' http: https: ws: wss:; " +
-            "object-src 'none'; " +
-            "base-uri 'self'; " +
-            "frame-src 'none';"
-          ]
-        }
-      });
-    } else {
-      callback({ responseHeaders: details.responseHeaders });
-    }
-  });
+ipcMain.handle('quick-reply:send', async (event, replyData) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for quick-reply:send');
+    return false;
+  }
+  if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
+  if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
+    quickReplyWindow.hide();
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('quick-reply:submitted', replyData);
+    return true;
+  }
+  return false;
+});
 
+ipcMain.handle('quick-reply:open-chat', async (event, conversationId) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for quick-reply:open-chat');
+    return false;
+  }
+  if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
+  if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
+    quickReplyWindow.hide();
+  }
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    if (conversationId) {
+      mainWindow.webContents.send('quick-reply:navigate', conversationId);
+    }
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('quick-reply:close', async (event) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for quick-reply:close');
+    return false;
+  }
+  if (quickReplyTimeout) clearTimeout(quickReplyTimeout);
+  if (quickReplyWindow && !quickReplyWindow.isDestroyed()) {
+    quickReplyWindow.hide();
+  }
+  return true;
+});
+
+// Auto-Updater IPC handlers (Hardened with isTrustedRendererSender)
+ipcMain.handle('updater:check', async (event) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for updater:check');
+    return { ok: false, error: 'Unauthorized IPC caller' };
+  }
+  if (!app.isPackaged) {
+    return { ok: false, message: 'Auto-update is only active in packaged desktop builds' };
+  }
+  try {
+    updaterState = { ...updaterState, status: 'checking', error: null };
+    broadcastUpdaterStatus();
+    const result = await autoUpdater.checkForUpdates();
+    return { ok: true, updateInfo: result?.updateInfo };
+  } catch (err) {
+    updaterState = { ...updaterState, status: 'error', error: err?.message || 'Failed to check for updates' };
+    broadcastUpdaterStatus();
+    return { ok: false, error: err?.message };
+  }
+});
+
+ipcMain.handle('updater:install', async (event) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for updater:install');
+    return false;
+  }
+  isQuitting = true;
+  autoUpdater.quitAndInstall();
+  return true;
+});
+
+ipcMain.handle('updater:get-state', async (event) => {
+  if (!isTrustedRendererSender(event)) {
+    console.warn('[Security Guard] Unauthorized IPC caller rejected for updater:get-state');
+    return null;
+  }
+  return { ...updaterState, version: app.getVersion() };
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+app.whenReady().then(() => {
   createWindow();
+  createTray();
+
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        console.log('[AutoUpdater] Initial background check notice:', err?.message);
+      });
+    }, 6000);
+
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        console.log('[AutoUpdater] Periodic check notice:', err?.message);
+      });
+    }, 2 * 60 * 60 * 1000);
+  }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    } else {
       createWindow();
     }
   });

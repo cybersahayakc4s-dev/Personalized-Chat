@@ -1,5 +1,7 @@
 import { isElectron, getElectronApi } from '../utils/electron';
 
+export const PRODUCTION_SERVER_URL = 'https://chat.cybersahayak.cloud';
+
 // REST client for Personalize Chat API
 export function getServerBaseUrl(): string {
   if (typeof window === 'undefined') return '';
@@ -17,7 +19,12 @@ export function getServerBaseUrl(): string {
     return envUrl.trim().replace(/\/$/, '');
   }
 
-  // 3. Fallback: If running inside Electron or via file:// protocol, default to http://localhost:8000
+  // 3. Production mode: Web app and packaged desktop .exe lock strictly to production server
+  if (import.meta.env.PROD || (isElectron() && !import.meta.env.DEV)) {
+    return PRODUCTION_SERVER_URL;
+  }
+
+  // 4. Local dev mode inside Electron or file:// protocol
   if (window.location.protocol === 'file:' || window.location.origin === 'null' || isElectron()) {
     return 'http://localhost:8000';
   }
@@ -462,5 +469,26 @@ export const api = {
   adminResetData: () =>
     request<{ status: string; message: string }>('/main-admin/reset-data', {
       method: 'POST',
+    }),
+  uploadBanner: async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = getStoredToken();
+    const res = await fetch(`${getApiBase()}/users/me/banner`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to upload banner' }));
+      throw new Error(err.detail || 'Failed to upload banner');
+    }
+    return res.json();
+  },
+  removeBanner: () =>
+    request<any>('/users/me/banner', {
+      method: 'DELETE',
     }),
 };

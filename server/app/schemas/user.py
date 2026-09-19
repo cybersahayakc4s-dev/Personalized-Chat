@@ -8,6 +8,8 @@ class UserBase(BaseModel):
     email: EmailStr
     team: Optional[TeamEnum] = None
     is_team_leader: bool = False
+    banner_url: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -21,6 +23,8 @@ class UserUpdate(BaseModel):
     team: Optional[TeamEnum] = None
     is_team_leader: Optional[bool] = None
     status: Optional[Union[str, UserStatus]] = None
+    banner_url: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 class UserOut(BaseModel):
     id: int
@@ -29,6 +33,8 @@ class UserOut(BaseModel):
     is_main_admin: bool
     team: Optional[TeamEnum] = None
     is_team_leader: bool
+    banner_url: Optional[str] = None
+    avatar_url: Optional[str] = None
     account_status: UserStatus = UserStatus.active
     is_active: bool = True
     presence: str = "offline"

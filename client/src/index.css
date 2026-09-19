@@ -2,43 +2,133 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-canvas: var(--bg-canvas);
+  --color-sidebar: var(--bg-sidebar);
+  --color-rail: var(--bg-rail);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-subtle: var(--border-subtle);
+  --color-focus: var(--border-focus);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-danger: var(--danger);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-focus: var(--border-focus);
+  --color-border-accent: var(--accent);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-accent: var(--accent);
+  --color-text-danger: var(--danger);
+  --color-bg-canvas: var(--bg-canvas);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-rail: var(--bg-rail);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-surface-hover: var(--bg-surface-hover);
+  --color-bg-accent: var(--accent);
+  --color-bg-accent-hover: var(--accent-hover);
+  --color-bg-accent-muted: var(--accent-muted);
+  --color-bg-danger: var(--danger);
+
+  --color-presence-online: var(--presence-online);
+  --color-presence-busy: var(--presence-busy);
+  --color-presence-offline: var(--presence-offline);
+  --color-presence-away: var(--presence-away);
+  --color-tick-sent: var(--tick-sent);
+  --color-tick-delivered: var(--tick-delivered);
+  --color-tick-seen: var(--tick-seen);
 }
 
-/* ==========================================================================
-   SEMANTIC THEME TOKENS (Series-C Executive System)
-   ========================================================================== */
+:root, [data-theme="light"] {
+  /* Semantic Presence Tokens (Decoupled from accent) */
+  --presence-online: #10b981;
+  --presence-online-glow: rgba(16, 185, 129, 0.25);
+  --presence-busy: #ef4444;
+  --presence-busy-glow: rgba(239, 68, 68, 0.25);
+  --presence-offline: #94a3b8;
+  --presence-offline-dark: #71717a;
+  --presence-away: #f59e0b;
 
-:root, [data-theme='nordic'], .theme-nordic {
-  /* Toned-Down Executive Neutral (Zero Glare, Muted Soft Slate, Not Blinding White) */
-  --surface-base: #D8DFE7;
-  --surface-subtle: #0C121E;
-  --surface-card: #E8EEF5;
-  --surface-raised: #DFE5ED;
-  --surface-overlay: #E4EAF2;
-  --border-subtle: #C6D0DC;
-  --border-medium: #B2BFCF;
-  --text-primary: #1E293B;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
-  --accent-brand: #2563EB;
-  --accent-brand-hover: #1D4ED8;
-  --accent-brand-subtle: rgba(37, 99, 235, 0.1);
-  --accent-danger: #EF4444;
-  --accent-warning: #D97706;
-  --bubble-incoming: #E8EEF5;
-  --bubble-outgoing: #2563EB;
-  --bubble-outgoing-text: #FFFFFF;
-  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-raised: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-  --shadow-overlay: 0 12px 20px -4px rgba(0, 0, 0, 0.1);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  /* Message Status Ticks */
+  --tick-sent: #94a3b8;
+  --tick-delivered: #94a3b8;
+  --tick-seen: #38bdf8;
+  --tick-seen-glow: rgba(56, 189, 248, 0.2);
 
-  /* Proper Z-Index Scale */
+  /* Light Dual-Tone: Cool Mist Navigation Spine vs. Crisp White Workspace */
+  --bg-rail: #e2e8f0;                 /* structured cool mist rail */
+  --bg-sidebar: #edf2f7;              /* cool mist navigation spine */
+  --bg-canvas: #ffffff;               /* crisp white workspace canvas */
+  --bg-surface: #ffffff;              /* elevated white cards and chat bubbles */
+  --bg-surface-hover: #f1f5f9;        /* subtle interactive hover state */
+  --border-subtle: #e2e8f0;           /* clean, crisp 1px borders */
+  --border-focus: #2563eb;
+  --text-primary: #0f172a;            /* deep slate black — WCAG AAA contrast */
+  --text-secondary: #334155;          /* legible secondary slate */
+  --text-muted: #64748b;              /* soft metadata text */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-muted: rgba(37, 99, 235, 0.12);
+  --danger: #dc2626;
+
+  /* Theme-adaptive chat background gradients (Light) - subtle atmospheric glow */
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(37, 99, 235, 0.05) 0%, rgba(99, 102, 241, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-midnight: radial-gradient(circle at 50% -10%, rgba(71, 85, 105, 0.05) 0%, rgba(100, 116, 139, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-emerald: radial-gradient(circle at 50% -10%, rgba(16, 185, 129, 0.05) 0%, rgba(20, 184, 166, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+
+  /* Chat bubble tokens */
+  --bubble-own-bg: #eff6ff;         /* delicate soft royal-blue tint for own messages */
+  --bubble-own-text: #1e3a8a;       /* deep crisp blue text */
+  --bubble-own-border: #bfdbfe;     /* subtle border framing */
+  --bubble-other-bg: #f8fafc;       /* clean elevated card for others on white canvas */
+  --bubble-other-text: #0f172a;
+  --bubble-other-border: #e2e8f0;
+
+  /* Radix / Shadcn Aliases */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-surface-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-sidebar);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: #ffffff;
+  --destructive: var(--danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--border-subtle);
+  --input: var(--border-subtle);
+  --ring: var(--border-focus);
+  --radius: 8px;
+
+  /* Legacy Compatibility Aliases */
+  --surface-base: var(--bg-canvas);
+  --surface-subtle: var(--bg-sidebar);
+  --surface-card: var(--bg-surface);
+  --surface-raised: var(--bg-surface-hover);
+  --surface-overlay: var(--bg-surface);
+  --border-medium: var(--border-focus);
+  --text-tertiary: var(--text-muted);
+  --accent-brand: var(--accent);
+  --accent-brand-hover: var(--accent-hover);
+  --accent-brand-subtle: var(--accent-muted);
+  --accent-danger: var(--danger);
+  --accent-warning: var(--danger);
+
+  /* Z-Index Scale */
   --z-dropdown: 30;
   --z-popover: 40;
   --z-drawer: 50;
@@ -47,7 +137,89 @@
   --z-toast: 100;
 }
 
-/* Electron window drag bar support */
+.dark, [data-theme="dark"], [data-theme="slate"], [data-theme="nordic"] {
+  /* Dark Dual-Tone: Deep Obsidian Navigation Spine vs. Elevated Graphite Workspace */
+  --bg-rail: #0a0c11;                 /* deep obsidian navigation rail */
+  --bg-sidebar: #0f121a;              /* obsidian sidebar spine */
+  --bg-canvas: #141722;               /* refined graphite workspace canvas */
+  --bg-surface: #1b202e;              /* elevated graphite card surface */
+  --bg-surface-hover: #23293b;        /* responsive hover highlight */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-focus: #3b82f6;
+  --text-primary: #f8fafc;          /* clean, crisp readable off-white */
+  --text-secondary: #94a3b8;        /* balanced secondary slate */
+  --text-muted: #64748b;            /* legible muted text */
+  --accent: #3b82f6;                /* vibrant royal accent */
+  --accent-hover: #60a5fa;
+  --accent-muted: rgba(59, 130, 246, 0.18);
+  --danger: #ef4444;
+
+  /* Theme-adaptive chat background gradients (Dark) - whisper-subtle atmospheric depth */
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(59, 130, 246, 0.08) 0%, rgba(30, 58, 138, 0.03) 45%, var(--bg-canvas) 100%);
+  --chat-gradient-midnight: radial-gradient(circle at 50% -10%, rgba(71, 85, 105, 0.08) 0%, rgba(30, 41, 59, 0.03) 45%, var(--bg-canvas) 100%);
+  --chat-gradient-emerald: radial-gradient(circle at 50% -10%, rgba(16, 185, 129, 0.07) 0%, rgba(5, 150, 105, 0.02) 45%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+
+  /* Chat bubble tokens */
+  --bubble-own-bg: #19263e;         /* deep muted navy with balanced contrast */
+  --bubble-own-text: #f1f5f9;       /* bright crisp text */
+  --bubble-own-border: rgba(59, 130, 246, 0.32);
+  --bubble-other-bg: #1c2130;       /* elevated dark surface card */
+  --bubble-other-text: #f8fafc;
+  --bubble-other-border: rgba(255, 255, 255, 0.08);
+
+  /* Radix / Shadcn Aliases */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-surface-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-sidebar);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: #ffffff;
+  --destructive: var(--danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--border-subtle);
+  --input: var(--border-subtle);
+  --ring: var(--border-focus);
+
+  /* Legacy Compatibility Aliases */
+  --surface-base: var(--bg-canvas);
+  --surface-subtle: var(--bg-sidebar);
+  --surface-card: var(--bg-surface);
+  --surface-raised: var(--bg-surface-hover);
+  --surface-overlay: var(--bg-surface);
+  --border-medium: var(--border-focus);
+  --text-tertiary: var(--text-muted);
+  --accent-brand: var(--accent);
+  --accent-brand-hover: var(--accent-hover);
+  --accent-brand-subtle: var(--accent-muted);
+  --accent-danger: var(--danger);
+  --accent-warning: var(--danger);
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+  body {
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-optical-sizing: auto;
+  }
+}
+
+/* Electron drag regions */
 .electron-drag {
   -webkit-app-region: drag;
   user-select: none;
@@ -63,150 +235,12 @@
   -webkit-app-region: no-drag;
 }
 
-[data-theme='slate'], .theme-slate, [data-theme='whatsapp'], .theme-whatsapp {
-  /* Toned-Down Executive Dark (Calm Slate Obsidian, No Neon Navy) */
-  --surface-base: #121620;
-  --surface-subtle: #0C121E;
-  --surface-card: #182030;
-  --surface-raised: #1D2638;
-  --surface-overlay: #161D2B;
-  --border-subtle: #222C3E;
-  --border-medium: #2B374E;
-  --text-primary: #E2E8F0;
-  --text-secondary: #94A3B8;
-  --text-tertiary: #64748B;
-  --accent-brand: #3B82F6;
-  --accent-brand-hover: #2563EB;
-  --accent-brand-subtle: rgba(59, 130, 246, 0.15);
-  --accent-danger: #F43F5E;
-  --accent-warning: #F59E0B;
-  --bubble-incoming: #182030;
-  --bubble-outgoing: #2563EB;
-  --bubble-outgoing-text: #FFFFFF;
-}
-
-@layer base {
-  * {
-    border-color: var(--border-subtle);
-  }
-
-  html, body {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-primary);
-    background-color: var(--surface-base);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-}
-
 /* ==========================================================================
-   TYPOGRAPHY SCALE (1.25 Modular Major Third)
+   Custom Scrollbar System (Resolves native white scrollbar on dark theme)
    ========================================================================== */
-
-.text-display {
-  font-family: 'Inter', sans-serif;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 32px;
-  letter-spacing: -0.025em;
-}
-
-.text-heading {
-  font-family: 'Inter', sans-serif;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
-  letter-spacing: -0.02em;
-}
-
-.text-subheading {
-  font-family: 'Inter', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  letter-spacing: -0.015em;
-}
-
-.text-body-md {
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  letter-spacing: -0.005em;
-}
-
-.text-body-sm {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.text-caption {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 16px;
-  letter-spacing: 0.01em;
-}
-
-.text-code {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-/* ==========================================================================
-   INTERACTIONS & SKELETON SHIMMER
-   ========================================================================== */
-
-.btn-tactile {
-  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
-}
-
-.btn-tactile:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.focus-ring {
-  outline: none;
-}
-
-.focus-ring:focus-visible {
-  outline: 2px solid var(--accent-brand);
-  outline-offset: 2px;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.03) 25%,
-    rgba(255, 255, 255, 0.08) 37%,
-    rgba(255, 255, 255, 0.03) 63%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Custom subtle micro scrollbar across all themes and dark mode */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.25) transparent;
-}
-
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -214,56 +248,425 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.25);
+  background: var(--border-subtle);
   border-radius: 9999px;
+  transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  background: var(--border-focus);
 }
 
-/* Specific sleek dark scrollbar for left sidebar */
-.custom-sidebar-scroll {
+/* Firefox scrollbar styling */
+* {
   scrollbar-width: thin;
-  scrollbar-color: rgba(71, 85, 105, 0.28) transparent;
+  scrollbar-color: var(--border-subtle) transparent;
 }
 
-.custom-sidebar-scroll::-webkit-scrollbar {
-  width: 4px;
+/* User preference to hide scrollbars completely */
+[data-hide-scrollbar="true"] *::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-.custom-sidebar-scroll::-webkit-scrollbar-track {
-  background: transparent;
+[data-hide-scrollbar="true"] *,
+.hide-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
-.custom-sidebar-scroll::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.28);
-  border-radius: 9999px;
+/* ==========================================================================
+   Font Size Scaling System
+   ========================================================================== */
+html[data-font-size="small"] {
+  font-size: 13.5px;
 }
 
-.custom-sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.5);
+html[data-font-size="medium"],
+html:not([data-font-size]) {
+  font-size: 15px;
 }
 
-/* Subtle micro lock shake for locked access attempts (KISS) */
-@keyframes lock-shake {
-  0%, 100% {
-    transform: translateX(0) rotate(0deg);
+/* ==========================================================================
+/* ==========================================================================
+   Dual-Tone Navigation Spine: High Contrast Scoping for Rails & Sidebars
+   ========================================================================== */
+.bg-sidebar,
+.bg-rail {
+  --color-primary: var(--sidebar-text, #f8fafc);
+  --color-secondary: var(--sidebar-muted, #cbd5e1);
+  --color-muted: var(--sidebar-muted, #94a3b8);
+  --text-primary: var(--sidebar-text, #f8fafc);
+  --text-secondary: var(--sidebar-muted, #cbd5e1);
+  --text-muted: var(--sidebar-muted, #94a3b8);
+  --color-surface: var(--sidebar-active, rgba(255, 255, 255, 0.12));
+  --color-surface-hover: var(--sidebar-hover, rgba(255, 255, 255, 0.07));
+  --color-subtle: var(--sidebar-border, rgba(255, 255, 255, 0.12));
+  --border-subtle: var(--sidebar-border, rgba(255, 255, 255, 0.12));
+  color: var(--sidebar-text, #f8fafc);
+}
+
+/* Explicit Utility Overrides inside Sidebar & Rail to guarantee 100% crisp contrast across Tailwind v4 */
+.bg-sidebar .text-primary,
+.bg-rail .text-primary {
+  color: var(--sidebar-text, #f8fafc) !important;
+}
+
+.bg-sidebar .text-secondary,
+.bg-rail .text-secondary {
+  color: var(--sidebar-muted, #cbd5e1) !important;
+}
+
+.bg-sidebar .text-muted,
+.bg-rail .text-muted {
+  color: var(--sidebar-muted, #cbd5e1) !important;
+}
+
+.bg-sidebar .hover\:text-primary:hover,
+.bg-rail .hover\:text-primary:hover {
+  color: #ffffff !important;
+}
+
+.bg-sidebar .border-subtle,
+.bg-rail .border-subtle {
+  border-color: var(--sidebar-border, rgba(255, 255, 255, 0.12)) !important;
+}
+
+.bg-sidebar .bg-surface-hover,
+.bg-rail .bg-surface-hover {
+  background-color: var(--sidebar-hover, rgba(255, 255, 255, 0.07)) !important;
+}
+
+.bg-sidebar-active {
+  background-color: var(--sidebar-active, rgba(255, 255, 255, 0.14)) !important;
+  color: var(--sidebar-text, #ffffff) !important;
+}
+
+.hover\:bg-sidebar-hover:hover {
+  background-color: var(--sidebar-hover, rgba(255, 255, 255, 0.07)) !important;
+}
+
+.border-sidebar-border {
+  border-color: var(--sidebar-border, rgba(255, 255, 255, 0.12)) !important;
+}
+
+/* White search capsule inside dark sidebar */
+.workspace-search-capsule {
+  background-color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+}
+.workspace-search-capsule .search-icon {
+  color: #64748b !important;
+}
+.workspace-search-capsule .search-text {
+  color: #475569 !important;
+}
+.workspace-search-capsule .search-kbd {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* ==========================================================================
+   Quadrant Theme Presets: 4 Light Themes (Dull Pastel Canvases) + 4 Dark Themes
+   ========================================================================== */
+
+/* 1. Oceanic Corporate (Quadrant 1 - Light) */
+[data-preset="oceanic_corporate"] {
+  --bg-rail: #1e293b;
+  --bg-sidebar: #334155;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-muted: rgba(59, 130, 246, 0.15);
+  --border-focus: #3b82f6;
+  --sidebar-text: #f8fafc;
+  --sidebar-muted: #cbd5e1;
+  --sidebar-active: rgba(59, 130, 246, 0.24);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --bg-canvas: #e8eef5;              /* Calm, dull cool-mist slate canvas */
+  --bg-surface: #ffffff;             /* Crisp elevated card */
+  --bg-surface-hover: #f1f5f9;
+  --border-subtle: #d6e0ea;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --bubble-own-bg: #dce7f5;
+  --bubble-own-text: #1e3a8a;
+  --bubble-own-border: #bcd0e8;
+  --bubble-other-bg: #ffffff;
+  --bubble-other-text: #0f172a;
+  --bubble-other-border: #d6e0ea;
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(59, 130, 246, 0.06) 0%, rgba(99, 102, 241, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+}
+
+/* 2. Natural Executive (Quadrant 2 - Light) */
+[data-preset="natural_executive"] {
+  --bg-rail: #142e24;
+  --bg-sidebar: #2c4a3e;
+  --accent: #4ade80;
+  --accent-hover: #22c55e;
+  --accent-muted: rgba(74, 222, 128, 0.15);
+  --border-focus: #4ade80;
+  --sidebar-text: #ecfdf5;
+  --sidebar-muted: #a7f3d0;
+  --sidebar-active: rgba(74, 222, 128, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --bg-canvas: #e5efe9;              /* Calm, dull soft sage green canvas */
+  --bg-surface: #ffffff;             /* Crisp elevated card */
+  --bg-surface-hover: #f0fdf4;
+  --border-subtle: #d0ded6;
+  --text-primary: #0f172a;
+  --text-secondary: #2c4a3e;
+  --text-muted: #4b6358;
+  --bubble-own-bg: #d8ece0;
+  --bubble-own-text: #14532d;
+  --bubble-own-border: #b7d9c3;
+  --bubble-other-bg: #ffffff;
+  --bubble-other-text: #0f172a;
+  --bubble-other-border: #d0ded6;
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(74, 222, 128, 0.06) 0%, rgba(34, 197, 94, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+}
+
+/* 3. Luxury Plum & Charcoal (Quadrant 3 - Light) */
+[data-preset="luxury_plum"] {
+  --bg-rail: #1f1424;
+  --bg-sidebar: #362a3c;
+  --accent: #c084fc;
+  --accent-hover: #a855f7;
+  --accent-muted: rgba(192, 132, 252, 0.15);
+  --border-focus: #c084fc;
+  --sidebar-text: #faf5ff;
+  --sidebar-muted: #e9d5ff;
+  --sidebar-active: rgba(192, 132, 252, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --bg-canvas: #efe7f2;              /* Calm, dull soft dusty plum/lilac canvas */
+  --bg-surface: #ffffff;             /* Crisp elevated card */
+  --bg-surface-hover: #faf5ff;
+  --border-subtle: #dccee0;
+  --text-primary: #0f172a;
+  --text-secondary: #362a3c;
+  --text-muted: #64566a;
+  --bubble-own-bg: #ebddf0;
+  --bubble-own-text: #581c87;
+  --bubble-own-border: #d7bfdf;
+  --bubble-other-bg: #ffffff;
+  --bubble-other-text: #0f172a;
+  --bubble-other-border: #dccee0;
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(192, 132, 252, 0.06) 0%, rgba(168, 85, 247, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+}
+
+/* 4. Midnight Cyber (Quadrant 4 - Light) */
+[data-preset="midnight_cyber"] {
+  --bg-rail: #0f172a;
+  --bg-sidebar: #1e3a52;
+  --accent: #22d3ee;
+  --accent-hover: #06b6d4;
+  --accent-muted: rgba(34, 211, 238, 0.15);
+  --border-focus: #22d3ee;
+  --sidebar-text: #ecfeff;
+  --sidebar-muted: #bae6fd;
+  --sidebar-active: rgba(34, 211, 238, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.14);
+  --bg-canvas: #e2eff4;              /* Calm, dull soft ocean ice-teal canvas */
+  --bg-surface: #ffffff;             /* Crisp elevated card */
+  --bg-surface-hover: #ecfeff;
+  --border-subtle: #cbdde4;
+  --text-primary: #0f172a;
+  --text-secondary: #1e3a52;
+  --text-muted: #4b6377;
+  --bubble-own-bg: #d1ecf4;
+  --bubble-own-text: #164e63;
+  --bubble-own-border: #b0dce6;
+  --bubble-other-bg: #ffffff;
+  --bubble-other-text: #0f172a;
+  --bubble-other-border: #cbdde4;
+  --chat-gradient-cobalt: radial-gradient(circle at 50% -10%, rgba(34, 211, 238, 0.06) 0%, rgba(6, 182, 212, 0.02) 40%, var(--bg-canvas) 100%);
+  --chat-gradient-none: var(--bg-canvas);
+}
+
+/* 5. Dark Cyber Indigo (Quadrant 5 - Dark) */
+[data-preset="dark_cyber_indigo"] {
+  --bg-rail: #090a0f;
+  --bg-sidebar: #161a2b;
+  --accent: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --accent-muted: rgba(139, 92, 246, 0.20);
+  --border-focus: #8b5cf6;
+  --sidebar-text: #e2e8f0;
+  --sidebar-muted: #94a3b8;
+  --sidebar-active: rgba(139, 92, 246, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --bg-canvas: #0d0f18;
+  --bg-surface: #141824;
+  --bg-surface-hover: #1e2336;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --bubble-own-bg: #201938;
+  --bubble-own-text: #ede9fe;
+  --bubble-own-border: rgba(139, 92, 246, 0.35);
+  --bubble-other-bg: #141824;
+  --bubble-other-text: #f8fafc;
+  --bubble-other-border: rgba(255, 255, 255, 0.08);
+}
+
+/* 6. Forest Obsidian & Mint (Quadrant 6 - Dark) */
+[data-preset="forest_obsidian"] {
+  --bg-rail: #070f0a;
+  --bg-sidebar: #13211b;
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --accent-muted: rgba(16, 185, 129, 0.20);
+  --border-focus: #10b981;
+  --sidebar-text: #d1fae5;
+  --sidebar-muted: #6ee7b7;
+  --sidebar-active: rgba(16, 185, 129, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --bg-canvas: #0a110e;
+  --bg-surface: #111a15;
+  --bg-surface-hover: #18251e;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #a7f3d0;
+  --text-muted: #64748b;
+  --bubble-own-bg: #112a1f;
+  --bubble-own-text: #ecfdf5;
+  --bubble-own-border: rgba(16, 185, 129, 0.35);
+  --bubble-other-bg: #111a15;
+  --bubble-other-text: #f8fafc;
+  --bubble-other-border: rgba(255, 255, 255, 0.08);
+}
+
+/* 7. Premium Carbon & Amber (Quadrant 7 - Dark) */
+[data-preset="premium_carbon"] {
+  --bg-rail: #0d0d0e;
+  --bg-sidebar: #1c1b1e;
+  --accent: #d97706;
+  --accent-hover: #f59e0b;
+  --accent-muted: rgba(217, 119, 6, 0.20);
+  --border-focus: #d97706;
+  --sidebar-text: #e4e4e7;
+  --sidebar-muted: #a1a1aa;
+  --sidebar-active: rgba(217, 119, 6, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --bg-canvas: #121113;
+  --bg-surface: #18171a;
+  --bg-surface-hover: #222026;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #d4d4d8;
+  --text-muted: #71717a;
+  --bubble-own-bg: #2a2218;
+  --bubble-own-text: #fef3c7;
+  --bubble-own-border: rgba(217, 119, 6, 0.35);
+  --bubble-other-bg: #18171a;
+  --bubble-other-text: #f8fafc;
+  --bubble-other-border: rgba(255, 255, 255, 0.08);
+}
+
+/* 8. Midnight Steel & Aqua (Quadrant 8 - Dark) */
+[data-preset="midnight_steel"] {
+  --bg-rail: #080e14;
+  --bg-sidebar: #112233;
+  --accent: #06b6d4;
+  --accent-hover: #22d3ee;
+  --accent-muted: rgba(6, 182, 212, 0.20);
+  --border-focus: #06b6d4;
+  --sidebar-text: #e0f2fe;
+  --sidebar-muted: #7dd3fc;
+  --sidebar-active: rgba(6, 182, 212, 0.22);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --bg-canvas: #0a141f;
+  --bg-surface: #0f1d2b;
+  --bg-surface-hover: #16293d;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #bae6fd;
+  --text-muted: #64748b;
+  --bubble-own-bg: #102b3b;
+  --bubble-own-text: #e0f2fe;
+  --bubble-own-border: rgba(6, 182, 212, 0.35);
+  --bubble-other-bg: #0f1d2b;
+  --bubble-other-text: #f8fafc;
+}
+
+/* Seen Status Hover Micro-Interaction (Kinetic Displacement) */
+.seen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #38bdf8;
+  background-color: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  cursor: default;
+  user-select: none;
+}
+
+.seen-pill:hover,
+.seen-pill:focus-visible {
+  background-color: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+}
+
+.seen-pill .seen-label {
+  display: inline-block;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.seen-pill:hover .seen-label,
+.seen-pill:focus-visible .seen-label {
+  transform: translateX(-2px);
+}
+
+.seen-pill .seen-time {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: #7dd3fc;
+  transform: translateX(4px);
+  transition: max-width 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.seen-pill:hover .seen-time,
+.seen-pill:focus-visible .seen-time {
+  max-width: 5.5rem;
+  opacity: 1;
+  transform: translateX(0);
+  margin-left: 0.125rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seen-pill,
+  .seen-pill .seen-label,
+  .seen-pill .seen-time {
+    transition: none !important;
+    transform: none !important;
   }
-  20% {
-    transform: translateX(-3px) rotate(-9deg);
-  }
-  40% {
-    transform: translateX(3px) rotate(9deg);
-  }
-  60% {
-    transform: translateX(-2px) rotate(-4deg);
-  }
-  80% {
-    transform: translateX(2px) rotate(4deg);
-  }
 }
 
-.animate-lock-shake {
-  animation: lock-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-}
+
+

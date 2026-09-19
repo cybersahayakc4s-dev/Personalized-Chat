@@ -61,8 +61,9 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
       // Query match
       if (query.trim()) {
         const lowerQ = query.toLowerCase();
-        const contentMatch = msg.content.toLowerCase().includes(lowerQ);
-        const attachmentMatch = msg.attachments?.some(att => att.name.toLowerCase().includes(lowerQ));
+        const contentMatch = (msg.content || '').toLowerCase().includes(lowerQ);
+        const safeAtts = Array.isArray(msg.attachments) ? msg.attachments : [];
+        const attachmentMatch = safeAtts.some(att => (att?.name || '').toLowerCase().includes(lowerQ));
         if (!contentMatch && !attachmentMatch) return false;
       } else if (!filterOnlyAttachments && filterSenderId === 'all') {
         // If no query and no filters, don't return all
@@ -75,8 +76,9 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
       }
 
       // Attachment filter
-      if (filterOnlyAttachments && (!msg.attachments || msg.attachments.length === 0)) {
-        return false;
+      if (filterOnlyAttachments) {
+        const safeAtts = Array.isArray(msg.attachments) ? msg.attachments : [];
+        if (safeAtts.length === 0) return false;
       }
 
       return true;
@@ -116,11 +118,11 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
     : `#${(activeConversation as { name?: string })?.name || 'channel'}`;
 
   return (
-    <div className="bg-slate-50 border-b border-slate-200 shadow-xs px-4 py-2.5 z-20 animate-in slide-in-from-top-2 duration-150">
+    <div className="bg-surface border-b border-subtle shadow-xs px-4 py-2.5 z-20 animate-in slide-in-from-top-2 duration-150">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         {/* Left: In-chat Scope indicator & Search Input */}
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0 max-w-xl">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-[4px] bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium truncate shrink-0 max-w-[150px] sm:max-w-none">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-hover border border-subtle text-secondary text-xs font-medium truncate shrink-0 max-w-36 sm:max-w-none">
             <Search className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">In {conversationName}</span>
           </div>
@@ -136,13 +138,13 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
               }}
               onKeyDown={handleKeyDown}
               placeholder={`Search messages in ${conversationName}...`}
-              className="w-full h-8 pl-3 pr-8 rounded-[4px] bg-white border border-slate-300 text-slate-900 placeholder-slate-400 text-xs focus:outline-hidden focus:border-blue-600 focus:ring-1 focus:ring-blue-600 font-body shadow-xs"
+              className="w-full h-8 pl-3 pr-8 rounded-md bg-canvas border border-subtle text-primary placeholder:text-muted text-xs focus:outline-hidden focus:border-focus font-body shadow-xs"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2 top-2 text-muted hover:text-primary cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -153,9 +155,9 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
         {/* Center: Match count & Next/Prev navigation */}
         <div className="flex items-center gap-2 text-xs">
           {query.trim() || filterSenderId !== 'all' || filterOnlyAttachments ? (
-            <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px] bg-white px-2.5 py-1 rounded-[4px] border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-1.5 text-secondary font-mono text-xs bg-surface px-2.5 py-1 rounded-md border border-subtle shadow-xs">
               {totalMatches === 0 ? (
-                <span className="text-rose-600 font-medium">0 matches</span>
+                <span className="text-danger font-medium">0 matches</span>
               ) : (
                 <span>
                   <strong>{currentMatchIndex + 1}</strong> of <strong>{totalMatches}</strong> match{totalMatches > 1 ? 'es' : ''}
@@ -169,7 +171,7 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
               <button
                 type="button"
                 onClick={handlePrev}
-                className="h-8 w-8 rounded-[4px] bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
+                className="h-8 w-8 rounded-md bg-surface hover:bg-surface-hover border border-subtle flex items-center justify-center text-secondary hover:text-primary transition-colors shadow-xs cursor-pointer"
                 title="Previous match (Shift+Enter)"
               >
                 <ChevronUp className="w-4 h-4" />
@@ -177,7 +179,7 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="h-8 w-8 rounded-[4px] bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors shadow-xs"
+                className="h-8 w-8 rounded-md bg-surface hover:bg-surface-hover border border-subtle flex items-center justify-center text-secondary hover:text-primary transition-colors shadow-xs cursor-pointer"
                 title="Next match (Enter)"
               >
                 <ChevronDown className="w-4 h-4" />
@@ -190,12 +192,12 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
             <select
               value={filterSenderId}
               onChange={e => setFilterSenderId(e.target.value)}
-              className="h-8 px-2 rounded-[4px] bg-white border border-slate-200 text-slate-700 text-xs focus:outline-hidden focus:border-blue-600 shadow-xs font-sans"
+              className="h-8 px-2.5 rounded-md bg-surface border border-subtle text-primary text-xs focus:outline-hidden focus:border-focus shadow-xs font-sans cursor-pointer transition-colors"
               title="Filter by sender in this chat"
             >
-              <option value="all">All senders</option>
+              <option value="all" className="bg-surface text-primary">All senders</option>
               {sendersInConversation.map(sender => (
-                <option key={sender.id} value={sender.id}>
+                <option key={sender.id} value={sender.id} className="bg-surface text-primary">
                   {sender.name}
                 </option>
               ))}
@@ -205,10 +207,10 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
             <button
               type="button"
               onClick={() => setFilterOnlyAttachments(!filterOnlyAttachments)}
-              className={`h-8 px-2 rounded-[4px] text-xs font-medium border flex items-center gap-1 transition-colors shadow-xs ${
+              className={`h-8 px-2 rounded-md text-xs font-medium border flex items-center gap-1 transition-colors shadow-xs cursor-pointer ${
                 filterOnlyAttachments
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+                  ? 'bg-accent-muted border-accent text-accent'
+                  : 'bg-surface border-subtle text-secondary hover:text-primary'
               }`}
               title="Only show messages with file attachments"
             >
@@ -221,7 +223,7 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-[4px] flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors ml-1"
+            className="h-8 w-8 rounded-md flex items-center justify-center text-secondary hover:text-primary hover:bg-surface-hover transition-colors ml-1 cursor-pointer"
             title="Close in-chat search (Esc)"
           >
             <X className="w-4 h-4" />
@@ -231,12 +233,12 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
 
       {/* Quick Results Drawer Dropdown if user has matches */}
       {showResultsList && matches.length > 0 && query.trim() && (
-        <div className="mt-2 pt-2 border-t border-slate-200 max-h-48 overflow-y-auto space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-500 tracking-wider flex items-center justify-between px-1">
+        <div className="mt-2 pt-2 border-t border-subtle max-h-48 overflow-y-auto space-y-1">
+          <div className="text-xs font-mono uppercase text-muted tracking-wider flex items-center justify-between px-1">
             <span>Matches in this chat ({matches.length})</span>
             <button
               onClick={() => setShowResultsList(false)}
-              className="hover:text-slate-700 text-[10px] normal-case underline"
+              className="hover:text-primary text-xs normal-case underline cursor-pointer"
             >
               Hide list
             </button>
@@ -252,22 +254,22 @@ export const InChatSearchBar: React.FC<InChatSearchBarProps> = ({
                 onClick={() => {
                   onSelectMessage(msg.id);
                 }}
-                className={`w-full text-left p-2 rounded-[4px] flex items-center justify-between gap-3 text-xs transition-colors ${
+                className={`w-full text-left p-2 rounded-md flex items-center justify-between gap-3 text-xs transition-colors cursor-pointer ${
                   isCurrent
-                    ? 'bg-blue-50 border border-blue-300 text-blue-900'
-                    : 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-700'
+                    ? 'bg-surface-hover border border-focus text-primary font-medium shadow-xs'
+                    : 'bg-surface hover:bg-surface-hover border border-subtle text-secondary'
                 }`}
               >
                 <div className="min-w-0 flex items-center gap-2">
-                  <span className="font-semibold text-slate-900 truncate max-w-[120px]">
+                  <span className="font-semibold text-primary truncate max-w-28">
                     {sender?.name}
                   </span>
-                  <span className="text-slate-400 text-[10px]">•</span>
-                  <span className="truncate text-slate-600 max-w-md">
+                  <span className="text-muted text-xs">•</span>
+                  <span className="truncate text-secondary max-w-md">
                     {msg.content}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] text-slate-400 flex-shrink-0">
+                <span className="font-mono text-xs text-muted flex-shrink-0">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </button>

@@ -57,28 +57,24 @@ export const QuickReplyPopup: React.FC = () => {
     }
   };
 
-  const isDark = theme !== 'nordic';
+  const isDark = theme !== 'light';
 
   return (
     <div className="fixed bottom-5 right-5 z-[var(--z-quickreply,80)] max-w-sm w-[calc(100vw-2.5rem)] sm:w-96 animate-in slide-in-from-bottom-5 fade-in duration-200">
-      <div className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-xl ${
-        isDark
-          ? 'bg-[#151D2A]/95 border-[#2A3852] text-slate-100 shadow-[0_12px_40px_rgba(0,0,0,0.6)]'
-          : 'bg-white/95 border-slate-200 text-slate-900 shadow-[0_12px_36px_rgba(0,0,0,0.15)]'
-      }`}>
+      <div className="p-4 rounded-2xl shadow-2xl border backdrop-blur-xl bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-700/40 dark:border-slate-800">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5 min-w-0">
             <Avatar user={senderUser as any} size="sm" showStatus={false} />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-xs truncate">{senderUser.name}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono font-medium">
+                <span className="font-semibold text-xs truncate text-[var(--text-primary)]">{senderUser.name}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-surface-hover)] text-[var(--brand-primary)] font-mono font-medium border border-[var(--border-subtle)]">
                   Quick Reply
                 </span>
               </div>
               {quickReplyState.messagePreview && (
-                <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className="text-xs truncate mt-0.5 text-[var(--text-secondary)]">
                   "{quickReplyState.messagePreview}"
                 </p>
               )}
@@ -87,9 +83,7 @@ export const QuickReplyPopup: React.FC = () => {
 
           <button
             onClick={closeQuickReply}
-            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-800'
-            }`}
+            className="p-1 rounded-lg transition-colors cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
             title="Close"
             aria-label="Close quick reply"
           >
@@ -106,11 +100,7 @@ export const QuickReplyPopup: React.FC = () => {
                 key={chip.label}
                 disabled={isSending}
                 onClick={() => handleSend(chip.text)}
-                className={`text-[11px] px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer font-medium border ${
-                  isDark
-                    ? 'bg-[#1C2638] hover:bg-blue-600 hover:text-white hover:border-blue-500 border-[#2E3C54] text-slate-300'
-                    : 'bg-slate-100 hover:bg-blue-600 hover:text-white hover:border-blue-500 border-slate-200 text-slate-700'
-                }`}
+                className="text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer font-medium border bg-[var(--bg-surface-hover)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--brand-primary)] hover:text-white hover:border-[var(--brand-primary)]"
               >
                 <Icon className="w-3 h-3 shrink-0" />
                 <span>{chip.label}</span>
@@ -134,16 +124,12 @@ export const QuickReplyPopup: React.FC = () => {
             value={replyText}
             onChange={e => setReplyText(e.target.value)}
             disabled={isSending}
-            className={`flex-1 px-3 py-2 rounded-xl text-xs outline-hidden border transition-all ${
-              isDark
-                ? 'bg-[#0E1420] border-[#2A3852] focus:border-blue-500 text-white placeholder-slate-500'
-                : 'bg-slate-50 border-slate-200 focus:border-blue-500 text-slate-900 placeholder-slate-400'
-            }`}
+            className="flex-1 px-3 py-2 rounded-xl text-xs outline-hidden border transition-all bg-[var(--bg-canvas)] border-[var(--border-subtle)] focus:border-[var(--brand-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
           />
           <button
             type="submit"
             disabled={!replyText.trim() || isSending}
-            className="w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-xs"
+            className="w-8 h-8 rounded-xl bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-xs"
             title="Send quick reply"
             aria-label="Send"
           >

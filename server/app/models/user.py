@@ -29,6 +29,8 @@ class User(Base):
     status = Column(Enum(UserStatus), default=UserStatus.active, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    banner_url = Column(String(512), nullable=True)
+    avatar_url = Column(String(512), nullable=True)
 
     # Relationships
     memberships = relationship("TeamMembership", back_populates="user", cascade="all, delete-orphan")

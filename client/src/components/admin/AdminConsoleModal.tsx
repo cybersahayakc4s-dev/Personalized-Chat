@@ -238,16 +238,16 @@ export const AdminConsoleModal: React.FC = () => {
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="p-6 rounded-2xl bg-slate-900 border border-rose-500/40 text-center max-w-sm cursor-default shadow-2xl"
+          className="p-6 rounded-2xl bg-canvas border border-danger/40 text-center max-w-sm cursor-default shadow-2xl"
         >
-          <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
-          <h3 className="font-heading font-bold text-slate-100">Access Denied</h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <AlertTriangle className="w-8 h-8 text-danger mx-auto mb-2" />
+          <h3 className="font-heading font-bold text-primary">Access Denied</h3>
+          <p className="text-xs text-muted mt-1">
             Only Main-Admin (`admin`) has administrative authority to access the console.
           </p>
           <button
             onClick={() => setAdminModalOpen(false)}
-            className="mt-4 px-4 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-200 hover:bg-slate-700 cursor-pointer"
+            className="mt-4 px-4 py-1.5 rounded-lg bg-surface-hover text-xs text-secondary hover:bg-surface-hover cursor-pointer"
           >
             Close
           </button>
@@ -303,7 +303,7 @@ export const AdminConsoleModal: React.FC = () => {
         name: newUserName,
         email: newUserEmail,
         handle: newUserHandle,
-        pass: pass
+        pass: 'pass'
       });
       setUserCreatedSuccess(true);
       setUserCreateError(null);
@@ -466,7 +466,7 @@ export const AdminConsoleModal: React.FC = () => {
     }
   };
 
-  const isDark = theme === 'slate';
+  const isDark = theme !== 'light';
 
   return (
     <div
@@ -477,12 +477,12 @@ export const AdminConsoleModal: React.FC = () => {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'} border rounded-xl shadow-2xl flex flex-col overflow-hidden transition-colors cursor-default`}
+        className="w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] bg-surface border-subtle text-primary border rounded-xl shadow-2xl flex flex-col overflow-hidden transition-colors cursor-default"
       >
         {/* Modal Header */}
-        <div className={`p-4 border-b ${isDark ? 'border-zinc-800 bg-zinc-950/60' : 'border-slate-200 bg-slate-50/80'} flex items-center justify-between`}>
+        <div className="p-4 border-b border-subtle bg-canvas flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-500">
+            <div className="w-9 h-9 rounded-lg bg-accent-muted border border-accent/30 text-accent flex items-center justify-center text-accent">
               <Shield className="w-5 h-5" />
             </div>
             <div>
@@ -490,11 +490,11 @@ export const AdminConsoleModal: React.FC = () => {
                 <h2 className="font-semibold text-base">
                   Admin Console
                 </h2>
-                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-blue-500/10 text-blue-500 border border-blue-500/20 font-medium">
+                <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-accent-muted text-accent border border-accent/20 font-medium">
                   CEO / Main-Admin
                 </span>
               </div>
-              <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              <p className="text-xs text-muted">
                 Workspace identity provisioning & governance • Operator: {currentUser.name} (@{currentUser.handle})
               </p>
             </div>
@@ -503,9 +503,7 @@ export const AdminConsoleModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setAdminModalOpen(false)}
-            className={`p-2 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-              isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:bg-zinc-700' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200'
-            }`}
+            className="p-2 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-secondary hover:text-primary hover:bg-surface-hover"
             title="Close Admin Console (Tap outside to close)"
             aria-label="Close Admin Console"
           >
@@ -514,12 +512,10 @@ export const AdminConsoleModal: React.FC = () => {
         </div>
 
         {/* Always-Visible Main-Admins Governance Bar */}
-        <div className={`px-4 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 ${
-          isDark ? 'bg-zinc-950/60 border-zinc-800' : 'bg-slate-50 border-slate-200'
-        }`}>
+        <div className="px-4 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 bg-canvas border-subtle">
           <div className="flex items-center gap-2">
-            <Shield className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span className={`text-xs font-mono font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+            <Shield className="w-3.5 h-3.5 text-secondary shrink-0" />
+            <span className="text-xs font-mono font-semibold text-secondary">
               Main-Admins ({mainAdmins.length || 1}):
             </span>
           </div>
@@ -527,21 +523,17 @@ export const AdminConsoleModal: React.FC = () => {
             {(mainAdmins.length > 0 ? mainAdmins : [{ id: currentUser.id, name: currentUser.name, email: currentUser.email }]).map((adm) => (
               <div
                 key={adm.id}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono border ${
                   adm.id === currentUser?.id || adm.email === currentUser?.email
-                    ? isDark
-                      ? 'bg-blue-950/50 border-blue-600/50 text-blue-300'
-                      : 'bg-blue-100 border-blue-300 text-blue-800'
-                    : isDark
-                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200'
-                    : 'bg-white border-slate-300 text-slate-800 shadow-xs'
+                    ? 'bg-accent-muted border-accent/40 text-accent'
+                    : 'bg-accent-muted border-accent/40 text-accent'
                 }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <span className="font-semibold">{adm.name}</span>
-                <span className="opacity-60 text-[10px]">({adm.email})</span>
+                <span className="opacity-60 text-xs">({adm.email})</span>
                 {(adm.id === currentUser?.id || adm.email === currentUser?.email) && (
-                  <span className="text-[9px] uppercase px-1 rounded bg-blue-500/20 text-blue-400 font-bold">You</span>
+                  <span className="text-xs uppercase px-1 rounded bg-accent-muted text-accent font-semibold">You</span>
                 )}
               </div>
             ))}
@@ -549,15 +541,15 @@ export const AdminConsoleModal: React.FC = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className={`flex items-center justify-between gap-1 px-3 sm:px-4 border-b ${isDark ? 'border-zinc-800 bg-zinc-900' : 'border-slate-200 bg-white'} text-xs font-mono`}>
+        <div className="flex items-center justify-between gap-1 px-3 sm:px-4 border-b border-subtle bg-surface text-xs font-mono">
           <div className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
             <button
               type="button"
               onClick={() => setActiveTab('users')}
               className={`flex items-center gap-2 px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors flex-shrink-0 cursor-pointer ${
                 activeTab === 'users'
-                  ? 'border-blue-600 text-blue-600 font-semibold'
-                  : isDark ? 'border-transparent text-zinc-400 hover:text-zinc-200' : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-secondary hover:text-primary'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
@@ -569,8 +561,8 @@ export const AdminConsoleModal: React.FC = () => {
               onClick={() => setActiveTab('channels')}
               className={`flex items-center gap-2 px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors flex-shrink-0 cursor-pointer ${
                 activeTab === 'channels'
-                  ? 'border-blue-600 text-blue-600 font-semibold'
-                  : isDark ? 'border-transparent text-zinc-400 hover:text-zinc-200' : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-secondary hover:text-primary'
               }`}
             >
               <Hash className="w-3.5 h-3.5" />
@@ -582,8 +574,8 @@ export const AdminConsoleModal: React.FC = () => {
               onClick={() => setActiveTab('audit')}
               className={`flex items-center gap-2 px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors flex-shrink-0 cursor-pointer ${
                 activeTab === 'audit'
-                  ? 'border-blue-600 text-blue-600 font-semibold'
-                  : isDark ? 'border-transparent text-zinc-400 hover:text-zinc-200' : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-secondary hover:text-primary'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
@@ -595,8 +587,8 @@ export const AdminConsoleModal: React.FC = () => {
               onClick={() => setActiveTab('settings')}
               className={`flex items-center gap-2 px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors flex-shrink-0 cursor-pointer ${
                 activeTab === 'settings'
-                  ? 'border-blue-600 text-blue-600 font-semibold'
-                  : isDark ? 'border-transparent text-zinc-400 hover:text-zinc-200' : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-secondary hover:text-primary'
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
@@ -608,7 +600,7 @@ export const AdminConsoleModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setAdminModalOpen(false)}
-            className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 active:bg-rose-500/20 text-xs font-sans font-medium flex-shrink-0 ml-1 border border-rose-500/20 cursor-pointer"
+            className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-danger/10 text-danger active:bg-danger/20 text-xs font-sans font-medium flex-shrink-0 ml-1 border border-danger/20 cursor-pointer"
             title="Close modal"
             aria-label="Close modal"
           >
@@ -620,39 +612,37 @@ export const AdminConsoleModal: React.FC = () => {
         {/* Tab Content Body */}
         <div
           onScroll={() => { if (actionMenu) setActionMenu(null); }}
-          className={`flex-1 overflow-y-auto p-6 space-y-6 ${isDark ? 'bg-zinc-900/50' : 'bg-[#F8F9FA]'}`}
+          className="flex-1 overflow-y-auto p-6 space-y-6 bg-[var(--bg-canvas)] text-[var(--text-primary)]"
         >
           {/* TAB 1: USERS */}
           {activeTab === 'users' && (
             <div className="space-y-6">
               {/* Provision User Form */}
-              <div className={`p-5 rounded-xl border ${isDark ? 'bg-zinc-950/70 border-zinc-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+              <div className="p-5 rounded-xl border bg-canvas border-subtle">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-blue-500" />
+                    <UserPlus className="w-4 h-4 text-accent" />
                     <h3 className="font-semibold text-sm">
                       Provision New Colleague Account
                     </h3>
                   </div>
-                  <span className={`text-[11px] font-mono ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  <span className="text-xs font-mono text-muted">
                     Single-Admin Provisioning
                   </span>
                 </div>
 
                 {/* Copied credentials banner */}
                 {createdCredentials && (
-                  <div className={`mb-4 p-3 rounded-lg border ${
-                    isDark ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  } flex items-center justify-between flex-wrap gap-2`}>
+                  <div className="mb-4 p-3 rounded-lg border bg-accent-muted border-accent/40 text-accent flex items-center justify-between flex-wrap gap-2">
                     <div className="text-xs">
                       <div className="font-semibold flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <CheckCircle2 className="w-4 h-4 text-accent" />
                         <span>Account Provisioned: {createdCredentials.name}</span>
                       </div>
-                      <div className="font-mono text-[11px] mt-1 space-x-2">
+                      <div className="font-mono text-xs mt-1 space-x-2">
                         <span>Email: <strong>{createdCredentials.email}</strong></span>
                         <span>•</span>
-                        <span>Password: <strong className="text-amber-500">{createdCredentials.pass}</strong></span>
+                        <span>Password: <strong className="text-secondary">{createdCredentials.pass}</strong></span>
                         <span>•</span>
                         <span>Handle: <strong>@{createdCredentials.handle}</strong></span>
                       </div>
@@ -666,7 +656,7 @@ export const AdminConsoleModal: React.FC = () => {
                         setCopiedCreds(true);
                         setTimeout(() => setCopiedCreds(false), 2000);
                       }}
-                      className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-xs transition"
+                      className="px-3 py-1.5 rounded-md bg-accent text-white hover:opacity-90 text-xs font-medium flex items-center gap-1.5 shadow-xs transition"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>{copiedCreds ? 'Copied to Clipboard!' : 'Copy Credentials'}</span>
@@ -675,15 +665,15 @@ export const AdminConsoleModal: React.FC = () => {
                 )}
 
                 {userCreateError && (
-                  <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between text-xs animate-in fade-in duration-200">
+                  <div className="mb-4 p-3 rounded-xl bg-danger-muted border border-danger/30 text-danger flex items-center justify-between text-xs animate-in fade-in duration-200">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
                       <span className="font-medium">{userCreateError}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setUserCreateError(null)}
-                      className="text-rose-400 hover:text-rose-200"
+                      className="text-danger hover:underline"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -693,7 +683,7 @@ export const AdminConsoleModal: React.FC = () => {
                 <form onSubmit={handleCreateUserSubmit} className="space-y-4 text-xs">
                   {/* Account Role Selector */}
                   <div>
-                    <label className={`block mb-1.5 font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    <label className="block mb-1.5 font-mono text-xs text-muted">
                       Account Role / Privilege Level
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -702,16 +692,14 @@ export const AdminConsoleModal: React.FC = () => {
                         onClick={() => setNewUserAccountRole('employee')}
                         className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
                           newUserAccountRole === 'employee'
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : isDark
-                            ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-700'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-accent text-white border-accent shadow-xs'
+                            : 'bg-surface-hover border-subtle text-secondary hover:border-focus'
                         }`}
                       >
                         <Users className="w-4 h-4" />
                         <div>
                           <div className="font-mono text-xs font-semibold">Standard Employee</div>
-                          <div className={`text-[10px] ${newUserAccountRole === 'employee' ? 'text-blue-100' : isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+                          <div className={`text-xs ${newUserAccountRole === 'employee' ? 'text-white' : 'text-muted'}`}>
                             Assigned to team, standard chat permissions
                           </div>
                         </div>
@@ -722,16 +710,14 @@ export const AdminConsoleModal: React.FC = () => {
                         onClick={() => setNewUserAccountRole('main_admin')}
                         className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 cursor-pointer ${
                           newUserAccountRole === 'main_admin'
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                            : isDark
-                            ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-700'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-accent text-white border-accent shadow-xs'
+                            : 'bg-surface-hover border-subtle text-secondary hover:border-focus'
                         }`}
                       >
-                        <Shield className="w-4 h-4 text-amber-300" />
+                        <Shield className="w-4 h-4 text-secondary" />
                         <div>
                           <div className="font-mono text-xs font-semibold">Main-Admin (Co-Admin / CEO)</div>
-                          <div className={`text-[10px] ${newUserAccountRole === 'main_admin' ? 'text-amber-100' : isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+                          <div className={`text-xs ${newUserAccountRole === 'main_admin' ? 'text-primary' : 'text-muted'}`}>
                             Full executive control (requires sudo password)
                           </div>
                         </div>
@@ -739,11 +725,11 @@ export const AdminConsoleModal: React.FC = () => {
                     </div>
 
                     {newUserAccountRole === 'main_admin' && (
-                      <div className="mt-2.5 p-3 rounded-lg border bg-amber-500/10 border-amber-500/30 flex items-start gap-2 text-xs text-amber-300">
-                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="mt-2.5 p-3 rounded-lg border bg-accent/10 border-accent/30 flex items-start gap-2 text-xs text-secondary">
+                        <AlertTriangle className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
                         <div>
-                          <span className="font-semibold text-amber-200">Elevated Workspace Access:</span>
-                          <p className="text-[11px] text-amber-300/80 mt-0.5">
+                          <span className="font-semibold text-primary font-semibold">Elevated Workspace Access:</span>
+                          <p className="text-xs text-secondary/80 mt-0.5">
                             Main-Admin accounts possess full administrative privileges including user provisioning, password resets, audit log inspection, workspace settings, and system resets. Creating this account requires verifying your current Main-Admin password.
                           </p>
                         </div>
@@ -753,7 +739,7 @@ export const AdminConsoleModal: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className={`block mb-1 font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                      <label className="block mb-1 font-mono text-xs text-muted">
                         Full Name
                       </label>
                       <input
@@ -762,38 +748,34 @@ export const AdminConsoleModal: React.FC = () => {
                         onChange={e => handleNameChange(e.target.value)}
                         placeholder="e.g. Danny Vance"
                         required
-                        className={`w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden ${
-                          isDark ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                        }`}
+                        className="w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden bg-surface border-subtle text-primary focus:border-accent"
                       />
                     </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className={`block font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                        <label className="block font-mono text-xs text-muted">
                           Handle (@mention tag)
                         </label>
-                        <span className="text-[10px] text-blue-500 font-mono">
+                        <span className="text-xs text-accent font-mono">
                           Colleague @mention in chat
                         </span>
                       </div>
                       <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">@</span>
+                        <span className="absolute left-3 top-2.5 text-muted font-mono text-xs">@</span>
                         <input
                           type="text"
                           value={newUserHandle}
                           onChange={e => setNewUserHandle(e.target.value)}
                           placeholder="danny.vance"
                           required
-                          className={`w-full h-9 pl-7 pr-3 rounded-lg border text-xs font-mono focus:outline-hidden ${
-                            isDark ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                          }`}
+                          className="w-full h-9 pl-7 pr-3 rounded-lg border text-xs font-mono focus:outline-hidden bg-surface border-subtle text-primary focus:border-accent"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className={`block mb-1 font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                      <label className="block mb-1 font-mono text-xs text-muted">
                         Internal Email
                       </label>
                       <input
@@ -802,14 +784,12 @@ export const AdminConsoleModal: React.FC = () => {
                         onChange={e => setNewUserEmail(e.target.value)}
                         placeholder="danny@company.internal"
                         required
-                        className={`w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden ${
-                          isDark ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                        }`}
+                        className="w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden bg-surface border-subtle text-primary focus:border-accent"
                       />
                     </div>
 
                     <div>
-                      <label className={`block mb-1 font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                      <label className="block mb-1 font-mono text-xs text-muted">
                         Role / Title
                       </label>
                       <input
@@ -817,25 +797,23 @@ export const AdminConsoleModal: React.FC = () => {
                         value={newUserTitle}
                         onChange={e => setNewUserTitle(e.target.value)}
                         placeholder="e.g. Machine Learning Engineer"
-                        className={`w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden ${
-                          isDark ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                        }`}
+                        className="w-full h-9 px-3 rounded-lg border text-xs focus:outline-hidden bg-surface border-subtle text-primary focus:border-accent"
                       />
                     </div>
 
                     {/* Password Generator Field */}
                     <div className="sm:col-span-2">
                       <div className="flex items-center justify-between mb-1">
-                        <label className={`block font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                        <label className="block font-mono text-xs text-muted">
                           Provisioning Password
                         </label>
                         <button
                           type="button"
                           onClick={generatePassword}
-                          className="text-[11px] text-amber-500 hover:text-amber-400 font-medium flex items-center gap-1.5 transition"
+                          className="text-xs text-accent hover:underline font-medium flex items-center gap-1.5 transition cursor-pointer"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>⚡ Generate Secure Password</span>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Generate Secure Password</span>
                         </button>
                       </div>
                       <div className="relative">
@@ -845,14 +823,12 @@ export const AdminConsoleModal: React.FC = () => {
                           onChange={e => setNewUserPassword(e.target.value)}
                           placeholder="Type password or click 'Generate Secure Password'"
                           required
-                          className={`w-full h-9 pl-3 pr-10 rounded-lg border text-xs font-mono focus:outline-hidden ${
-                            isDark ? 'bg-zinc-900 border-zinc-700 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-                          }`}
+                          className="w-full h-9 pl-3 pr-10 rounded-lg border text-xs font-mono focus:outline-hidden bg-surface border-subtle text-primary focus:border-accent"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          className="absolute right-3 top-2.5 text-muted hover:text-secondary dark:hover:text-secondary"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -862,7 +838,7 @@ export const AdminConsoleModal: React.FC = () => {
 
                   {/* Team Tag Selection */}
                   <div>
-                    <label className={`block mb-1.5 font-mono text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    <label className="block mb-1.5 font-mono text-xs text-muted">
                       Mandatory Team Tag (Strict 5 Internal Teams Enforced)
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -876,14 +852,12 @@ export const AdminConsoleModal: React.FC = () => {
                             onClick={() => setNewUserTeam(teamId)}
                             className={`p-2.5 rounded-lg border text-left transition-all ${
                               isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                : isDark
-                                ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-700'
-                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                ? 'bg-accent text-white border-accent shadow-xs'
+                                : 'bg-surface-hover border-subtle text-secondary hover:border-focus'
                             }`}
                           >
                             <div className="font-mono text-xs font-semibold">{meta.label}</div>
-                            <div className={`text-[10px] truncate mt-0.5 ${isSelected ? 'text-blue-100' : isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+                            <div className={`text-xs truncate mt-0.5 ${isSelected ? 'text-white' : 'text-muted'}`}>
                               {meta.name}
                             </div>
                           </button>
@@ -893,25 +867,23 @@ export const AdminConsoleModal: React.FC = () => {
                   </div>
 
                   {/* Team Leader Privileges Checkbox */}
-                  <div className={`p-3 rounded-lg border flex items-center gap-2.5 ${
-                    isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
+                  <div className="p-3 rounded-lg border flex items-center gap-2.5 bg-secondary-900 border-subtle">
                     <input
                       type="checkbox"
                       id="team_leader_checkbox"
                       checked={isTeamLeader}
                       onChange={e => setIsTeamLeader(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer"
+                      className="w-4 h-4 rounded border-subtle text-accent focus:ring-0 cursor-pointer"
                     />
                     <label htmlFor="team_leader_checkbox" className="text-xs cursor-pointer select-none">
-                      <span className="font-semibold">Team Leader Privileges:</span> Allows posting operational updates in <span className="font-mono text-blue-500">#updates</span>.
+                      <span className="font-semibold">Team Leader Privileges:</span> Allows posting operational updates in <span className="font-mono text-accent">#updates</span>.
                     </label>
                   </div>
 
                   <div className="pt-2 flex justify-end">
                     <button
                       type="submit"
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-2 shadow-xs transition"
+                      className="px-4 py-2 rounded-lg bg-accent text-white hover:opacity-90 font-medium flex items-center gap-2 shadow-xs transition"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Provision User Account</span>
@@ -922,12 +894,12 @@ export const AdminConsoleModal: React.FC = () => {
 
               {/* Existing Users Table */}
               <div>
-                <h4 className={`font-semibold text-sm mb-2 ${isDark ? 'text-zinc-200' : 'text-slate-800'}`}>
+                <h4 className="font-semibold text-sm mb-2 text-secondary">
                   Enrolled Colleagues ({users.length})
                 </h4>
-                <div className={`rounded-xl border overflow-x-auto ${isDark ? 'border-zinc-800 bg-zinc-950/40' : 'border-slate-300/80 bg-[#FAFBFD] shadow-xs'}`}>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-x-auto shadow-xs">
                   <table className="w-full min-w-[500px] text-left text-xs">
-                    <thead className={`border-b text-[11px] font-mono ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-slate-200/70 border-slate-300/80 text-slate-700'}`}>
+                    <thead className="border-b text-xs font-mono bg-surface border-subtle text-muted">
                       <tr>
                         <th className="p-3 font-semibold">User</th>
                         <th className="p-3 font-semibold">Role</th>
@@ -936,26 +908,26 @@ export const AdminConsoleModal: React.FC = () => {
                         <th className="p-3 text-right font-semibold">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className={`divide-y ${isDark ? 'divide-zinc-800/60' : 'divide-slate-200/80'}`}>
+                    <tbody className="divide-y divide-subtle">
                       {users.map(u => (
-                        <tr key={u.id} className={`transition-colors ${isDark ? 'hover:bg-zinc-900/40' : 'hover:bg-slate-100/80'}`}>
+                        <tr key={u.id} className="transition-colors hover:bg-surface-hover">
                           <td className="p-3">
                             <div className="flex items-center gap-2.5">
                               <Avatar user={u} size="sm" showStatus={false} />
                               <div>
-                                <div className={`font-semibold flex items-center gap-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-900'}`}>
+                                <div className="font-semibold flex items-center gap-1.5 text-secondary">
                                   <span>{u.name}</span>
                                   {u.account_status === 'deleted' ? (
-                                    <span className="text-[9px] px-1 rounded bg-zinc-500/20 text-zinc-400 font-mono">
+                                    <span className="text-xs px-1 rounded bg-surface-hover text-muted font-mono">
                                       DELETED
                                     </span>
                                   ) : !u.isActive ? (
-                                    <span className="text-[9px] px-1 rounded bg-rose-500/20 text-rose-400 font-mono">
+                                    <span className="text-xs px-1 rounded bg-danger/20 text-danger font-mono">
                                       SUSPENDED
                                     </span>
                                   ) : null}
                                 </div>
-                                <div className={`text-[11px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-600 font-medium'}`}>
+                                <div className="text-xs font-mono text-muted">
                                   @{u.handle} • {u.email}
                                 </div>
                               </div>
@@ -967,7 +939,7 @@ export const AdminConsoleModal: React.FC = () => {
                           <td className="p-3">
                             <TeamBadge team={u.team} size="sm" />
                           </td>
-                          <td className={`p-3 font-mono text-[11px] capitalize ${isDark ? 'text-slate-400' : 'text-slate-700 font-medium'}`}>
+                          <td className="p-3 font-mono text-xs capitalize text-muted">
                             {u.account_status || u.status}
                           </td>
                           <td className="p-3 text-right">
@@ -975,9 +947,7 @@ export const AdminConsoleModal: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditUser(u)}
-                                className={`p-1.5 rounded transition-colors cursor-pointer ${
-                                  isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/70'
-                                }`}
+                                className="p-1.5 rounded transition-colors cursor-pointer text-muted hover:text-primary hover:bg-surface-hover"
                                 title="Edit User Name, Team & Role"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -985,9 +955,7 @@ export const AdminConsoleModal: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenResetPassword(u)}
-                                className={`p-1.5 rounded transition-colors cursor-pointer ${
-                                  isDark ? 'text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-100/70'
-                                }`}
+                                className="p-1.5 rounded transition-colors cursor-pointer text-secondary hover:text-primary hover:bg-surface-hover"
                                 title="Reset Password"
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
@@ -998,8 +966,8 @@ export const AdminConsoleModal: React.FC = () => {
                                   onClick={(e) => handleToggleActionMenu(e, u)}
                                   className={`p-1.5 rounded transition-colors cursor-pointer ${
                                     actionMenu?.user.id === u.id
-                                      ? isDark ? 'bg-zinc-800 text-white' : 'bg-slate-200 text-slate-900'
-                                      : isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/70'
+                                      ? 'bg-surface-hover text-primary'
+                                      : 'text-muted hover:text-primary hover:bg-surface-hover'
                                   }`}
                                   title="More Options"
                                 >
@@ -1022,14 +990,14 @@ export const AdminConsoleModal: React.FC = () => {
             <div className="space-y-6">
               {/* Create Channel Form - Gated by Governance Policy */}
               {settings.allowCustomChannels ? (
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <h3 className="font-heading font-semibold text-sm text-slate-200 mb-3 flex items-center gap-2">
-                    <Hash className="w-4 h-4 text-blue-400" />
+                <div className="p-4 rounded-xl bg-canvas border border-subtle">
+                  <h3 className="font-semibold text-sm text-secondary mb-3 flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-accent" />
                     Create Custom Channel
                   </h3>
 
                   {chanCreatedSuccess && (
-                    <div className="mb-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                    <div className="mb-3 p-2 rounded-lg bg-accent-muted border border-accent/30 text-accent text-xs flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4" />
                       Channel created successfully!
                     </div>
@@ -1038,23 +1006,23 @@ export const AdminConsoleModal: React.FC = () => {
                   <form onSubmit={handleCreateChannelSubmit} className="space-y-3 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-400 mb-1 font-mono text-[11px]">Channel Name</label>
+                        <label className="block text-muted mb-1 font-mono text-xs">Channel Name</label>
                         <input
                           type="text"
                           value={newChanName}
                           onChange={e => setNewChanName(e.target.value)}
                           placeholder="e.g. infra-benchmarks"
                           required
-                          className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                          className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-400 mb-1 font-mono text-[11px]">Channel Type</label>
+                        <label className="block text-muted mb-1 font-mono text-xs">Channel Type</label>
                         <select
                           value={newChanType}
                           onChange={e => setNewChanType(e.target.value as ChannelType)}
-                          className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500"
+                          className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent"
                         >
                           <option value="team">Team Channel (Restricted)</option>
                           <option value="public">Public (All Company)</option>
@@ -1065,13 +1033,13 @@ export const AdminConsoleModal: React.FC = () => {
 
                     {newChanType === 'team' && (
                       <div>
-                        <label className="block text-slate-400 mb-1 font-mono text-[11px]">
+                        <label className="block text-muted mb-1 font-mono text-xs">
                           Target Team (Strict 5 Teams)
                         </label>
                         <select
                           value={newChanTeam}
                           onChange={e => setNewChanTeam(e.target.value as TeamId)}
-                          className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                          className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono"
                         >
                           <option value="team_ai">team_ai (AI Engineering)</option>
                           <option value="team_legal">team_legal (Legal & Compliance)</option>
@@ -1083,20 +1051,20 @@ export const AdminConsoleModal: React.FC = () => {
                     )}
 
                     <div>
-                      <label className="block text-slate-400 mb-1 font-mono text-[11px]">Description & Topic</label>
+                      <label className="block text-muted mb-1 font-mono text-xs">Description & Topic</label>
                       <input
                         type="text"
                         value={newChanDesc}
                         onChange={e => setNewChanDesc(e.target.value)}
                         placeholder="Purpose of this channel..."
-                        className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500"
+                        className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent"
                       />
                     </div>
 
                     <div className="flex justify-end pt-1">
                       <button
                         type="submit"
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-2 cursor-pointer"
+                        className="px-4 py-2 rounded-lg bg-accent text-white hover:opacity-90 font-medium flex items-center gap-2 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         Create Channel
@@ -1105,23 +1073,23 @@ export const AdminConsoleModal: React.FC = () => {
                   </form>
                 </div>
               ) : (
-                <div className={`p-5 rounded-xl border ${isDark ? 'bg-zinc-950/60 border-zinc-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+                <div className="p-5 rounded-xl border bg-canvas border-subtle">
                   <div className="flex items-start gap-3.5">
-                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 flex-shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-lg bg-accent-muted border border-accent/30 text-accent flex items-center justify-center text-accent flex-shrink-0 mt-0.5">
                       <Hash className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className={`font-semibold text-sm ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+                      <h4 className="font-semibold text-sm text-primary">
                         Fixed Organizational Structure
                       </h4>
-                      <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                      <p className="text-xs mt-1 leading-relaxed text-muted">
                         Custom channel provisioning is currently disabled by governance policy. The workspace operates under the 5 core organizational departments and corporate broadcast feeds (#announcements, #updates).
                       </p>
                       <div className="mt-3">
                         <button
                           type="button"
                           onClick={() => setActiveTab('settings')}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 border border-blue-500/30 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="px-3 py-1.5 rounded-lg bg-accent-muted text-accent border border-accent/30 hover:bg-accent/20 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Settings className="w-3.5 h-3.5" />
                           <span>Enable Custom Channels in Governance Settings</span>
@@ -1134,33 +1102,33 @@ export const AdminConsoleModal: React.FC = () => {
 
               {/* Channels List */}
               <div className="space-y-2">
-                <h4 className="font-heading font-semibold text-sm text-slate-200">
+                <h4 className="font-semibold text-sm text-secondary">
                   Active Channels ({channels.length})
                 </h4>
                 <div className="space-y-2">
                   {channels.map(chan => (
                     <div
                       key={chan.id}
-                      className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs"
+                      className="flex items-center justify-between p-3 rounded-xl bg-canvas border border-subtle text-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <Hash className="w-4 h-4 text-slate-400" />
+                        <Hash className="w-4 h-4 text-muted" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-200">{chan.name}</span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+                            <span className="font-semibold text-secondary">{chan.name}</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-muted font-mono">
                               {chan.type}
                             </span>
                             {chan.team && <TeamBadge team={chan.team} size="sm" />}
                           </div>
-                          <p className="text-slate-400 text-[11px] mt-0.5">{chan.description}</p>
+                          <p className="text-muted text-xs mt-0.5">{chan.description}</p>
                         </div>
                       </div>
 
                       {chan.id !== 'c-general' && chan.id !== 'c-announcements' && (
                         <button
                           onClick={() => archiveChannel(chan.id)}
-                          className="text-rose-400 hover:text-rose-300 font-mono text-xs px-2 py-1 rounded hover:bg-rose-500/10"
+                          className="text-danger hover:underline font-mono text-xs px-2 py-1 rounded hover:bg-danger-muted"
                         >
                           Archive
                         </button>
@@ -1177,27 +1145,27 @@ export const AdminConsoleModal: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-heading font-semibold text-sm text-slate-200">
+                  <h3 className="font-semibold text-sm text-secondary">
                     Security & RBAC Audit Stream
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-muted">
                     Immutable administrative ledger tracking RBAC enforcement and provisioning events.
                   </p>
                 </div>
                 <div className="relative w-64">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-2.5" />
                   <input
                     type="text"
                     value={auditSearch}
                     onChange={e => setAuditSearch(e.target.value)}
                     placeholder="Filter audit logs..."
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface border border-subtle text-xs text-primary focus:outline-hidden focus:border-accent font-mono"
                   />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden font-mono text-[11px]">
-                <div className="divide-y divide-slate-800/80">
+              <div className="rounded-xl border border-subtle bg-canvas overflow-hidden font-mono text-xs">
+                <div className="divide-y divide-subtle">
                   {auditLogs
                     .filter(
                       log =>
@@ -1205,19 +1173,19 @@ export const AdminConsoleModal: React.FC = () => {
                         log.details.toLowerCase().includes(auditSearch.toLowerCase())
                     )
                     .map(log => (
-                      <div key={log.id} className="p-3 hover:bg-slate-900/40 flex items-start justify-between gap-3">
+                      <div key={log.id} className="p-3 hover:bg-canvas/40 flex items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">
+                            <span className="px-1.5 py-0.5 rounded bg-accent-muted text-accent font-semibold">
                               {log.action}
                             </span>
-                            <span className="text-slate-400">Actor: {log.actorId}</span>
-                            <span className="text-slate-400">•</span>
-                            <span className="text-slate-400">{log.ipAddress}</span>
+                            <span className="text-muted">Actor: {log.actorId}</span>
+                            <span className="text-muted">•</span>
+                            <span className="text-muted">{log.ipAddress}</span>
                           </div>
-                          <p className="text-slate-300 mt-1">{log.details}</p>
+                          <p className="text-secondary mt-1">{log.details}</p>
                         </div>
-                        <span className="text-slate-400 flex-shrink-0">
+                        <span className="text-muted flex-shrink-0">
                           {new Date(log.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
@@ -1230,50 +1198,50 @@ export const AdminConsoleModal: React.FC = () => {
           {/* TAB 4: GOVERNANCE & SETTINGS */}
           {activeTab === 'settings' && (
             <div className="space-y-6 text-xs">
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <h3 className="font-heading font-semibold text-sm text-slate-200">
+              <div className="p-4 rounded-xl bg-canvas border border-subtle space-y-4">
+                <h3 className="font-semibold text-sm text-secondary">
                   Workspace Governance Settings
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-400 mb-1 font-mono text-[11px]">
+                    <label className="block text-muted mb-1 font-mono text-xs">
                       Organization Name
                     </label>
                     <input
                       type="text"
                       value={settings.name}
                       onChange={e => updateSettings({ name: e.target.value })}
-                      className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500"
+                      className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1 font-mono text-[11px]">
+                    <label className="block text-muted mb-1 font-mono text-xs">
                       Mesh Domain
                     </label>
                     <input
                       type="text"
                       value={settings.domain}
                       onChange={e => updateSettings({ domain: e.target.value })}
-                      className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                      className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1 font-mono text-[11px]">
+                    <label className="block text-muted mb-1 font-mono text-xs">
                       Message Retention Period (Days)
                     </label>
                     <input
                       type="number"
                       value={settings.retentionDays}
                       onChange={e => updateSettings({ retentionDays: Number(e.target.value) })}
-                      className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                      className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1 font-mono text-[11px]">
+                    <label className="block text-muted mb-1 font-mono text-xs">
                       Max Attachment Size (MB)
                     </label>
                     <input
@@ -1282,36 +1250,36 @@ export const AdminConsoleModal: React.FC = () => {
                       onChange={e =>
                         updateSettings({ maxUploadSizeBytes: Number(e.target.value) * 1024 * 1024 })
                       }
-                      className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono"
+                      className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono"
                     />
                   </div>
 
-                  <div className="sm:col-span-2 pt-2 border-t border-slate-800/80">
-                    <label className="block text-slate-400 mb-1 font-mono text-[11px] flex items-center justify-between">
-                      <span className="text-slate-200 font-semibold">Server Link / Remote VPS Address</span>
-                      <span className="text-[10px] text-slate-500 font-sans">Default: Local Server (http://127.0.0.1:8000)</span>
+                  <div className="sm:col-span-2 pt-2 border-t border-subtle/80">
+                    <label className="block text-muted mb-1 font-mono text-xs flex items-center justify-between">
+                      <span className="text-secondary font-semibold">Server Link / Remote VPS Address</span>
+                      <span className="text-xs text-muted font-sans">Default: Local Server (http://127.0.0.1:8000)</span>
                     </label>
                     <input
                       type="text"
                       placeholder="e.g. http://192.168.1.100:8000 or https://chat.company.com"
                       value={settings.serverUrl || ''}
                       onChange={e => updateSettings({ serverUrl: e.target.value })}
-                      className="w-full p-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 focus:outline-hidden focus:border-blue-500 font-mono text-xs"
+                      className="w-full p-2 rounded-lg bg-canvas border border-subtle text-primary focus:outline-hidden focus:border-accent font-mono text-xs"
                     />
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-xs text-muted mt-1">
                       Configure your VPS domain or IP. All web app and PWA clients will route REST API and real-time Socket.IO events to this address.
                     </p>
                   </div>
 
                   {/* Custom Channel Provisioning Policy Toggle */}
-                  <div className="sm:col-span-2 pt-3 border-t border-slate-800/80">
+                  <div className="sm:col-span-2 pt-3 border-t border-subtle/80">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <label className="text-slate-200 font-semibold text-xs flex items-center gap-1.5">
-                          <Hash className="w-3.5 h-3.5 text-blue-400" />
+                        <label className="text-secondary font-semibold text-xs flex items-center gap-1.5">
+                          <Hash className="w-3.5 h-3.5 text-accent" />
                           <span>Allow Custom Channel Provisioning</span>
                         </label>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-xs text-muted mt-0.5">
                           Allow Main-Admins to create custom project/topic channels in the Channels tab. When disabled, the workspace is strictly scoped to the 5 core departments and system broadcasts.
                         </p>
                       </div>
@@ -1322,7 +1290,7 @@ export const AdminConsoleModal: React.FC = () => {
                           onChange={e => updateSettings({ allowCustomChannels: e.target.checked })}
                           className="sr-only peer"
                         />
-                        <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div className="w-11 h-6 bg-surface-hover peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-secondary after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                       </label>
                     </div>
                   </div>
@@ -1330,12 +1298,12 @@ export const AdminConsoleModal: React.FC = () => {
               </div>
 
               {/* Export & Reset Actions */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="p-4 rounded-xl bg-canvas border border-subtle flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-heading font-semibold text-sm text-slate-200">
+                  <h4 className="font-semibold text-sm text-secondary">
                     Data Portability & State Snapshot
                   </h4>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-muted">
                     Export full encrypted snapshot or reset local database state.
                   </p>
                 </div>
@@ -1343,7 +1311,7 @@ export const AdminConsoleModal: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleExportBackup}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-2 font-mono"
+                    className="px-3 py-1.5 rounded-lg bg-surface-hover hover:bg-surface-hover text-secondary flex items-center gap-2 font-mono"
                   >
                     <FileDown className="w-4 h-4" />
                     Export Backup JSON
@@ -1352,7 +1320,7 @@ export const AdminConsoleModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowResetSeedConfirm(true)}
-                    className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-2 font-mono cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-danger/10 hover:bg-danger-muted text-danger border border-danger/30 flex items-center gap-2 font-mono cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reset Data to Seed
@@ -1376,32 +1344,30 @@ export const AdminConsoleModal: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default ${
-              isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}
+            className="w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default bg-surface border-subtle text-primary"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/40 mb-4">
+            <div className="flex items-center justify-between pb-3 border-b border-subtle/40 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <div className="w-8 h-8 rounded-lg bg-accent-muted border border-accent/30 text-accent flex items-center justify-center text-accent">
                   <Edit2 className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">Edit User Profile</h3>
-                  <p className="text-[11px] text-slate-400 font-mono">@{editingUser.handle} • {editingUser.email}</p>
+                  <p className="text-xs text-muted font-mono">@{editingUser.handle} • {editingUser.email}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
                 disabled={isSavingEdit}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+                className="p-1 rounded-md text-muted hover:text-secondary hover:bg-surface-hover cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {editError && (
-              <div className="mb-4 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-2.5 rounded-lg bg-danger-muted border border-danger/30 text-danger text-xs flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span>{editError}</span>
               </div>
@@ -1409,28 +1375,24 @@ export const AdminConsoleModal: React.FC = () => {
 
             <div className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1.5 font-medium">Display Name</label>
+                <label className="block text-muted mb-1.5 font-medium">Display Name</label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   disabled={isSavingEdit}
-                  className={`w-full px-3 py-2 rounded-lg border text-xs outline-none transition-colors ${
-                    isDark ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200 focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-xs outline-none transition-colors bg-surface-hover border-subtle text-primary focus:border-accent"
                   placeholder="Full name"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1.5 font-medium">Assigned Team</label>
+                <label className="block text-muted mb-1.5 font-medium">Assigned Team</label>
                 <select
                   value={editTeam}
                   onChange={(e) => setEditTeam(e.target.value as TeamId)}
                   disabled={isSavingEdit}
-                  className={`w-full px-3 py-2 rounded-lg border text-xs outline-none transition-colors ${
-                    isDark ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200 focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500'
-                  }`}
+                  className="w-full px-3 py-2 rounded-lg border text-xs outline-none transition-colors bg-surface-hover border-subtle text-primary focus:border-accent"
                 >
                   {Object.entries(TEAMS_META).map(([tId, tMeta]) => (
                     <option key={tId} value={tId}>
@@ -1439,7 +1401,7 @@ export const AdminConsoleModal: React.FC = () => {
                   ))}
                 </select>
                 {editingUser.team !== editTeam && (
-                  <p className="mt-1 text-[11px] text-amber-400 flex items-center gap-1">
+                  <p className="mt-1 text-xs text-secondary flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                     Team change will close past team channels and migrate live sessions.
                   </p>
@@ -1454,23 +1416,23 @@ export const AdminConsoleModal: React.FC = () => {
                       checked={editIsTeamLeader}
                       onChange={(e) => setEditIsTeamLeader(e.target.checked)}
                       disabled={isSavingEdit}
-                      className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-subtle text-accent focus:ring-accent"
                     />
-                    <span className="font-medium text-slate-300">Grant Team Leader privileges</span>
+                    <span className="font-medium text-secondary">Grant Team Leader privileges</span>
                   </label>
-                  <p className="text-[11px] text-slate-500 mt-1 pl-5">
+                  <p className="text-xs text-muted mt-1 pl-5">
                     Team leaders have moderator authority within their team channels.
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-zinc-800/40">
+            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-subtle/40">
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
                 disabled={isSavingEdit}
-                className="px-3.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs text-muted hover:text-secondary hover:bg-surface-hover cursor-pointer"
               >
                 Cancel
               </button>
@@ -1478,7 +1440,7 @@ export const AdminConsoleModal: React.FC = () => {
                 type="button"
                 onClick={() => handleSaveUser(false)}
                 disabled={isSavingEdit}
-                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-accent text-white hover:opacity-90 shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {isSavingEdit ? (
                   <>
@@ -1501,9 +1463,9 @@ export const AdminConsoleModal: React.FC = () => {
         description={
           <div>
             <p>
-              Are you sure you want to reassign <span className="font-semibold text-slate-200">{editingUser?.name}</span> from <span className="font-mono text-amber-400">{TEAMS_META[editingUser?.team as TeamId]?.name || editingUser?.team}</span> to <span className="font-mono text-emerald-400">{TEAMS_META[editTeam]?.name || editTeam}</span>?
+              Are you sure you want to reassign <span className="font-semibold text-secondary">{editingUser?.name}</span> from <span className="font-mono text-secondary">{TEAMS_META[editingUser?.team as TeamId]?.name || editingUser?.team}</span> to <span className="font-mono text-accent">{TEAMS_META[editTeam]?.name || editTeam}</span>?
             </p>
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-muted">
               This will close access to past team channels, grant access to the new team, and migrate all active live sessions across devices.
             </p>
           </div>
@@ -1527,62 +1489,60 @@ export const AdminConsoleModal: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default ${
-              isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}
+            className="w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default bg-surface border-subtle text-primary"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/40 mb-4">
+            <div className="flex items-center justify-between pb-3 border-b border-subtle/40 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <div className="w-8 h-8 rounded-lg bg-surface-hover border border-subtle flex items-center justify-center text-secondary">
                   <KeyRound className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">Reset User Password</h3>
-                  <p className="text-[11px] text-slate-400 font-mono">@{resetTargetUser.handle} • {resetTargetUser.email}</p>
+                  <p className="text-xs text-muted font-mono">@{resetTargetUser.handle} • {resetTargetUser.email}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setResetTargetUser(null)}
                 disabled={isResettingPassword}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+                className="p-1 rounded-md text-muted hover:text-secondary hover:bg-surface-hover cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 mb-4">
-              Resetting password for <span className="font-medium text-slate-200">{resetTargetUser.name}</span> will immediately revoke all their active sessions and tokens.
+            <p className="text-xs text-muted mb-4">
+              Resetting password for <span className="font-medium text-secondary">{resetTargetUser.name}</span> will immediately revoke all their active sessions and tokens.
             </p>
 
             {/* Main-Admin Step-Up Warning Banner & Current Password Field */}
             {Boolean(resetTargetUser.is_main_admin || resetTargetUser.role === 'main_admin') && (
               <div className="space-y-3 mb-4">
-                <div className="p-3 rounded-lg border bg-amber-500/10 border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-300">
-                  <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="p-3 rounded-lg border bg-accent/10 border-accent/30 flex items-start gap-2.5 text-xs text-secondary">
+                  <Shield className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-amber-200">Main-Admin Protection (Step-Up Auth)</p>
-                    <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    <p className="font-semibold text-primary font-semibold">Main-Admin Protection (Step-Up Auth)</p>
+                    <p className="text-xs text-secondary/80 mt-0.5">
                       You are modifying a Main-Admin account. Re-enter your current password to authorize this password change.
                     </p>
                   </div>
                 </div>
 
                 {resetPasswordError && (
-                  <div className="p-2.5 rounded-lg border bg-rose-500/10 border-rose-500/30 flex items-center justify-between text-xs text-rose-300">
+                  <div className="p-2.5 rounded-lg border bg-danger/10 border-danger/30 flex items-center justify-between text-xs text-danger">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
                       <span>{resetPasswordError}</span>
                     </div>
-                    <button type="button" onClick={() => setResetPasswordError(null)} className="text-rose-400 hover:text-rose-200">
+                    <button type="button" onClick={() => setResetPasswordError(null)} className="text-danger hover:underline">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-slate-400 mb-1 font-mono text-[11px]">
-                    Your Current Admin Password <span className="text-rose-400">*</span>
+                  <label className="block text-muted mb-1 font-mono text-xs">
+                    Your Current Admin Password <span className="text-danger">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -1592,14 +1552,12 @@ export const AdminConsoleModal: React.FC = () => {
                       disabled={isResettingPassword}
                       placeholder="Enter your current admin password"
                       autoFocus
-                      className={`w-full px-3 pr-10 py-2 rounded-lg border font-mono text-xs outline-none transition-colors ${
-                        isDark ? 'bg-zinc-800/80 border-zinc-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                      }`}
+                      className="w-full px-3 pr-10 py-2 rounded-lg border font-mono text-xs outline-none transition-colors bg-surface-hover border-subtle text-primary"
                     />
                     <button
                       type="button"
                       onClick={() => setShowAdminPasswordForReset(!showAdminPasswordForReset)}
-                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200"
+                      className="absolute right-3 top-2.5 text-muted hover:text-secondary"
                     >
                       {showAdminPasswordForReset ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -1610,16 +1568,14 @@ export const AdminConsoleModal: React.FC = () => {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-mono text-[11px]">New Password</label>
+                <label className="block text-muted mb-1 font-mono text-xs">New Password</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={newPasswordValue}
                     onChange={(e) => setNewPasswordValue(e.target.value)}
                     disabled={isResettingPassword}
-                    className={`flex-1 px-3 py-2 rounded-lg border font-mono text-xs outline-none transition-colors ${
-                      isDark ? 'bg-zinc-800/80 border-zinc-700 text-emerald-400' : 'bg-slate-50 border-slate-200 text-emerald-700'
-                    }`}
+                    className="flex-1 px-3 py-2 rounded-lg border font-mono text-xs outline-none transition-colors bg-surface-hover border-focus text-accent"
                   />
                   <button
                     type="button"
@@ -1632,7 +1588,7 @@ export const AdminConsoleModal: React.FC = () => {
                       setNewPasswordValue(pwd);
                     }}
                     disabled={isResettingPassword}
-                    className="px-2.5 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-mono cursor-pointer"
+                    className="px-2.5 py-2 rounded-lg border border-focus hover:bg-surface-hover text-secondary text-xs font-mono cursor-pointer"
                     title="Generate new random password"
                   >
                     Generate
@@ -1641,12 +1597,12 @@ export const AdminConsoleModal: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-zinc-800/40">
+            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-subtle/40">
               <button
                 type="button"
                 onClick={() => setResetTargetUser(null)}
                 disabled={isResettingPassword}
-                className="px-3.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs text-muted hover:text-secondary hover:bg-surface-hover cursor-pointer"
               >
                 Cancel
               </button>
@@ -1658,7 +1614,7 @@ export const AdminConsoleModal: React.FC = () => {
                   !newPasswordValue.trim() ||
                   (Boolean(resetTargetUser.is_main_admin || resetTargetUser.role === 'main_admin') && !adminPasswordForReset.trim())
                 }
-                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-accent text-white hover:opacity-90 shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {isResettingPassword ? (
                   <>
@@ -1684,24 +1640,22 @@ export const AdminConsoleModal: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default ${
-              isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}
+            className="w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default bg-surface border-subtle text-primary"
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <div className="w-10 h-10 rounded-xl bg-accent-muted border border-accent/30 flex items-center justify-center text-accent">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-semibold text-base">Password Reset Complete</h3>
-                <p className="text-xs text-slate-400">
-                  New password for <span className="font-medium text-slate-200">{revealedCredentials.user.name}</span>
+                <p className="text-xs text-muted">
+                  New password for <span className="font-medium text-secondary">{revealedCredentials.user.name}</span>
                 </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex items-center justify-between gap-3 mb-4">
-              <span className="font-mono text-base font-semibold text-emerald-400 tracking-wider select-all">
+            <div className="p-3.5 rounded-xl bg-canvas border border-emerald-500/30 flex items-center justify-between gap-3 mb-4">
+              <span className="font-mono text-base font-semibold text-accent tracking-wider select-all">
                 {revealedCredentials.password}
               </span>
               <button
@@ -1711,11 +1665,11 @@ export const AdminConsoleModal: React.FC = () => {
                   setCopiedResetPassword(true);
                   setTimeout(() => setCopiedResetPassword(false), 2000);
                 }}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-mono flex items-center gap-1.5 border border-emerald-500/30 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-accent-muted hover:bg-accent/20 text-accent border border-accent/30 text-xs font-mono flex items-center gap-1.5 border border-emerald-500/30 transition-colors cursor-pointer"
               >
                 {copiedResetPassword ? (
                   <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
                     Copied!
                   </>
                 ) : (
@@ -1727,7 +1681,7 @@ export const AdminConsoleModal: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2 mb-5">
+            <div className="p-3 rounded-lg bg-surface-hover border border-subtle text-secondary text-xs flex items-start gap-2 mb-5">
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <p>
                 Share this password securely with <span className="font-semibold">{revealedCredentials.user.name}</span>. It will not be shown again and is never logged in server or client logs.
@@ -1737,7 +1691,7 @@ export const AdminConsoleModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setRevealedCredentials(null)}
-              className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-medium transition-colors cursor-pointer"
+              className="w-full py-2 rounded-lg bg-surface-hover hover:bg-surface-hover text-secondary text-xs font-mono font-medium transition-colors cursor-pointer"
             >
               Done / Dismiss
             </button>
@@ -1759,42 +1713,40 @@ export const AdminConsoleModal: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default ${
-              isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}
+            className="w-full max-w-md p-6 rounded-2xl shadow-2xl border cursor-default bg-surface border-subtle text-primary"
           >
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <div className="w-10 h-10 rounded-xl bg-surface-hover border border-subtle flex items-center justify-center text-secondary">
                 <Shield className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-semibold text-base">Authorize Main-Admin Provisioning</h3>
-                <p className="text-xs text-slate-400">Step-Up Authentication Required</p>
+                <p className="text-xs text-muted">Step-Up Authentication Required</p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300/90 mb-4 space-y-1">
-              <p className="font-semibold text-amber-200">You are creating a new Main-Admin account:</p>
-              <div className="font-mono text-[11px] text-amber-100 pl-2">
+            <div className="p-3.5 rounded-xl bg-surface-hover border border-subtle text-xs text-secondary/90 mb-4 space-y-1">
+              <p className="font-semibold text-primary font-semibold">You are creating a new Main-Admin account:</p>
+              <div className="font-mono text-xs text-primary pl-2">
                 <div>• Name: <span className="font-semibold">{newUserName}</span></div>
                 <div>• Email: <span className="font-semibold">{newUserEmail}</span></div>
                 <div>• Handle: <span className="font-semibold">@{newUserHandle}</span></div>
               </div>
-              <p className="text-[10px] text-amber-300/70 pt-1">
+              <p className="text-xs text-secondary/70 pt-1">
                 This account will hold full CEO-level administrative privileges over the entire workspace.
               </p>
             </div>
 
             {adminCreateError && (
-              <div className="mb-4 p-2.5 rounded-lg border bg-rose-500/10 border-rose-500/30 flex items-center justify-between text-xs text-rose-300">
+              <div className="mb-4 p-2.5 rounded-lg border bg-danger/10 border-danger/30 flex items-center justify-between text-xs text-danger">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
                   <span>{adminCreateError}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAdminCreateError(null)}
-                  className="text-rose-400 hover:text-rose-200"
+                  className="text-danger hover:underline"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1803,8 +1755,8 @@ export const AdminConsoleModal: React.FC = () => {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-slate-400 mb-1 font-mono text-[11px]">
-                  Your Current Admin Password <span className="text-rose-400">*</span>
+                <label className="block text-muted mb-1 font-mono text-xs">
+                  Your Current Admin Password <span className="text-danger">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -1814,14 +1766,12 @@ export const AdminConsoleModal: React.FC = () => {
                     disabled={isAuthorizingAdminCreate}
                     placeholder="Enter your current password"
                     autoFocus
-                    className={`w-full px-3 pr-10 py-2 rounded-lg border font-mono text-xs outline-none transition-colors ${
-                      isDark ? 'bg-zinc-800/80 border-zinc-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
-                    }`}
+                    className="w-full px-3 pr-10 py-2 rounded-lg border font-mono text-xs outline-none transition-colors bg-surface-hover border-subtle text-primary"
                   />
                   <button
                     type="button"
                     onClick={() => setShowAdminPasswordForCreate(!showAdminPasswordForCreate)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3 top-2.5 text-muted hover:text-secondary"
                   >
                     {showAdminPasswordForCreate ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1829,7 +1779,7 @@ export const AdminConsoleModal: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-zinc-800/40">
+            <div className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-subtle/40">
               <button
                 type="button"
                 onClick={() => {
@@ -1838,7 +1788,7 @@ export const AdminConsoleModal: React.FC = () => {
                   setAdminCreateError(null);
                 }}
                 disabled={isAuthorizingAdminCreate}
-                className="px-3.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs text-muted hover:text-secondary hover:bg-surface-hover cursor-pointer"
               >
                 Cancel
               </button>
@@ -1846,7 +1796,7 @@ export const AdminConsoleModal: React.FC = () => {
                 type="button"
                 onClick={() => executeProvisionUser(true, adminPasswordForCreate)}
                 disabled={isAuthorizingAdminCreate || !adminPasswordForCreate.trim()}
-                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-accent text-white hover:opacity-90 shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {isAuthorizingAdminCreate ? (
                   <>
@@ -1886,11 +1836,11 @@ export const AdminConsoleModal: React.FC = () => {
           deleteTargetUser ? (
             <div className="space-y-3">
               <p>
-                Are you sure you want to delete <strong className={isDark ? 'text-white' : 'text-slate-900'}>{deleteTargetUser.name}</strong> (@{deleteTargetUser.handle})? Their account credentials and sessions will be permanently revoked. Historical messages will be preserved as '[Deleted User]'. This action cannot be undone.
+                Are you sure you want to delete <strong className="text-primary font-semibold">{deleteTargetUser.name}</strong> (@{deleteTargetUser.handle})? Their account credentials and sessions will be permanently revoked. Historical messages will be preserved as '[Deleted User]'. This action cannot be undone.
               </p>
               {deleteUserError && (
-                <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                <div className="p-3 rounded-lg bg-danger-muted border border-danger/30 text-danger text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-danger" />
                   <span>{deleteUserError}</span>
                 </div>
               )}
@@ -1926,9 +1876,7 @@ export const AdminConsoleModal: React.FC = () => {
               right: actionMenu.right,
               zIndex: 65,
             }}
-            className={`w-48 rounded-xl border shadow-2xl py-1.5 font-sans text-xs animate-in fade-in zoom-in-95 duration-100 ${
-              isDark ? 'bg-zinc-900 border-zinc-700 text-zinc-200' : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/60'
-            }`}
+            className="w-48 rounded-xl border shadow-2xl py-1.5 font-sans text-xs animate-in fade-in zoom-in-95 duration-100 bg-surface border-subtle text-primary"
           >
             <button
               type="button"
@@ -1940,11 +1888,11 @@ export const AdminConsoleModal: React.FC = () => {
               className={`w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-medium ${
                 isDark
                   ? actionMenu.user.isActive
-                    ? 'text-amber-400 hover:bg-amber-500/10'
-                    : 'text-emerald-400 hover:bg-emerald-500/10'
+                    ? 'text-secondary hover:bg-accent/10'
+                    : 'text-accent hover:bg-emerald-500/10'
                   : actionMenu.user.isActive
-                  ? 'text-amber-700 hover:bg-amber-50'
-                  : 'text-emerald-700 hover:bg-emerald-50'
+                  ? 'text-secondary hover:bg-surface-hover'
+                  : 'text-secondary hover:bg-surface-hover'
               }`}
             >
               {actionMenu.user.isActive ? (
@@ -1960,7 +1908,7 @@ export const AdminConsoleModal: React.FC = () => {
               )}
             </button>
 
-            <div className={`my-1 border-t ${isDark ? 'border-zinc-800' : 'border-slate-100'}`} />
+            <div className="my-1 border-t border-subtle" />
 
             <button
               type="button"
@@ -1970,11 +1918,7 @@ export const AdminConsoleModal: React.FC = () => {
                 setDeleteTargetUser(actionMenu.user);
                 setActionMenu(null);
               }}
-              className={`w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-medium ${
-                isDark
-                  ? 'text-rose-400 hover:bg-rose-500/10 hover:text-rose-300'
-                  : 'text-rose-600 hover:bg-rose-50 hover:text-rose-700'
-              }`}
+              className="w-full px-3.5 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-medium text-danger hover:bg-danger-muted hover:text-danger"
             >
               <Trash2 className="w-4 h-4 shrink-0" />
               <span>Delete Account</span>

@@ -26,4 +26,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onQuickReplyLoad: (callback) => {
     ipcRenderer.on('quick-reply:load', (_event, data) => callback(data));
   },
+
+  // Auto-updater desktop methods
+  getAppVersion: () => ipcRenderer.invoke('updater:get-state').then(s => s?.version || '3.1.0'),
+  getUpdaterState: () => ipcRenderer.invoke('updater:get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
+  onUpdaterStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('updater:status-changed', handler);
+    return () => ipcRenderer.removeListener('updater:status-changed', handler);
+  }
 });

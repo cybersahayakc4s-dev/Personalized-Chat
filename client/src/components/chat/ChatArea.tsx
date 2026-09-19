@@ -5,6 +5,7 @@ import { MessageItem } from './MessageItem';
 import { MessageInput } from './MessageInput';
 import { InChatSearchBar } from './InChatSearchBar';
 import { Avatar } from '../common/Avatar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   Search,
   Pin,
@@ -27,6 +28,7 @@ import {
 import { getUserDepartmentChannel } from '../../utils/rbac';
 import { formatDateDivider, getDayKey } from '../../utils/date';
 import { QuickReplyPopup } from './QuickReplyPopup';
+import { getUserNameColor } from '../../utils/userColors';
 import { NotificationSettingsModal } from './NotificationSettingsModal';
 
 export const ChatArea: React.FC = () => {
@@ -55,7 +57,9 @@ export const ChatArea: React.FC = () => {
     sendTestDesktopNotification,
     setNotificationSettingsModalOpen,
     setScheduleUpdateModalOpen,
-    addToast
+    setProfileModalUser,
+    addToast,
+    chatGradient
   } = useChat() as any;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -264,380 +268,375 @@ export const ChatArea: React.FC = () => {
     headerSubtitle = isTeam ? `Department • ${memberCount} member${memberCount === 1 ? '' : 's'}` : `Channel • ${memberCount} member${memberCount === 1 ? '' : 's'}`;
   }
 
-  const isDark = theme !== 'nordic';
+  const isDark = theme !== 'light';
 
   return (
-    <div className={`flex-1 flex flex-col h-full ${isDark ? 'bg-[#121620] text-[#E2E8F0]' : 'bg-[#D8DFE7] text-slate-800'} overflow-hidden min-w-0 transition-colors`}>
-      {/* 1. Application Header (Channel / DM Title & Quick Actions) */}
-      <header className={`h-16 border-b ${isDark ? 'border-[#222C3E] bg-[#161D2B]' : 'border-[#C6D0DC] bg-[#E4EAF2]'} px-3 sm:px-6 flex items-center justify-between flex-shrink-0 select-none transition-colors electron-drag`}>
-        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
-          <button
-            onClick={() => setSidebarMobileOpen(true)}
-            className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'} lg:hidden`}
-            aria-label="Toggle sidebar"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          {isDm ? (
-            <Avatar
-              user={otherUser || ({ name: headerTitle, status: 'online', team: 'team_ai' } as any)}
-              size="md"
-              showStatus={true}
-            />
-          ) : (
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm shadow-xs ${
-              isAnnouncement ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
-              isUpdates ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' :
-              'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
-            }`}>
-              {isAnnouncement ? <Megaphone className="w-4 h-4" /> : isUpdates ? <Sparkles className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
-            </div>
-          )}
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className={`font-semibold text-base tracking-tight truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {headerTitle}
-              </h1>
-            </div>
-            <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} flex items-center gap-2 mt-0.5 truncate`}>
-              {isDm ? (
-                <div className="flex items-center gap-1.5 truncate">
-                  <span>@{otherUser?.handle || 'user'}</span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${
-                      otherUser?.status === 'online'
-                        ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]'
-                        : otherUser?.status === 'busy'
-                        ? 'bg-amber-400'
-                        : 'bg-slate-400'
-                    }`} />
-                    <span className={
-                      otherUser?.status === 'online'
-                        ? 'text-emerald-400 font-medium'
-                        : otherUser?.status === 'busy'
-                        ? 'text-amber-400 font-medium'
-                        : 'text-slate-400'
-                    }>
-                      {otherUser?.status === 'online' ? 'Online' : otherUser?.status === 'busy' ? 'Busy' : 'Offline'}
-                    </span>
-                  </span>
-                </div>
-              ) : (
-                <span className="truncate">{headerSubtitle}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Header Actions: Icon-only buttons for Search, Notifications, and Details Panel */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Windows Desktop Notifications Quick Toggle / Test */}
-          <button
-            onClick={async () => {
-              if (desktopNotificationPermission === 'granted') {
-                sendTestDesktopNotification?.();
-                addToast?.({
-                  type: 'info',
-                  title: 'Windows Notification Sent',
-                  description: 'Look at the bottom-right of your Windows desktop for the popup.'
-                });
-              } else if (desktopNotificationPermission === 'denied') {
-                addToast?.({
-                  type: 'warning',
-                  title: 'Notifications Blocked',
-                  description: 'Please click the site permissions icon in your browser address bar to enable notifications.'
-                });
-              } else {
-                const res = await requestDesktopNotificationPermission?.();
-                if (res === 'granted') {
-                  addToast?.({
-                    type: 'success',
-                    title: 'Windows Notifications Enabled',
-                    description: 'You will now receive desktop popups for incoming direct messages.'
-                  });
-                }
-              }
-            }}
-            className={`relative w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
-              desktopNotificationPermission === 'granted'
-                ? isDark
-                  ? 'bg-[#182030] hover:bg-[#202B40] text-emerald-400 border-emerald-500/30'
-                  : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-emerald-600 border-emerald-500/30'
-                : desktopNotificationPermission === 'denied'
-                ? isDark
-                  ? 'bg-rose-950/30 text-rose-400 border-rose-800/40'
-                  : 'bg-rose-50 text-rose-600 border-rose-200'
-                : isDark
-                ? 'bg-[#182030] hover:bg-[#202B40] text-amber-400 border-amber-500/30'
-                : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-amber-600 border-amber-500/30'
-            }`}
-            title={
-              desktopNotificationPermission === 'granted'
-                ? 'Windows Notifications: Active (Click to send test popup)'
-                : desktopNotificationPermission === 'denied'
-                ? 'Windows Notifications: Blocked in browser settings'
-                : 'Enable Windows Desktop Notifications'
-            }
-            aria-label="Windows desktop notifications"
-          >
-            {desktopNotificationPermission === 'denied' ? (
-              <BellOff className="w-4 h-4" />
-            ) : (
-              <Bell className="w-4 h-4" />
-            )}
-            {desktopNotificationPermission === 'granted' && (
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.8)]" />
-            )}
-            {desktopNotificationPermission === 'default' && (
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            )}
-          </button>
-
-          {/* Notification Preferences Modal Toggle */}
-          <button
-            onClick={() => setNotificationSettingsModalOpen?.(true)}
-            className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
-              isDark
-                ? 'bg-[#182030] hover:bg-[#202B40] text-slate-300 border-[#2A364E]'
-                : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-slate-700 border-[#C6D0DC] shadow-2xs'
-            }`}
-            title="Notification preferences & privacy"
-            aria-label="Notification preferences"
-          >
-            <Sliders className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-
-          {/* Main-Admin Schedule Daily Updates Action in #updates */}
-          {isUpdates && currentUser?.role === 'main_admin' && (
+    <TooltipProvider>
+      <div
+        className="flex-1 flex flex-col h-full text-primary overflow-hidden min-w-0 transition-colors"
+        style={{ background: `var(--chat-gradient-${chatGradient || 'cobalt'})` }}
+      >
+        {/* 1. Application Header (Channel / DM Title & Quick Actions) */}
+        <header className="h-16 border-b border-subtle bg-canvas/70 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors electron-drag z-10">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
             <button
-              onClick={() => setScheduleUpdateModalOpen(true)}
-              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
-                isDark
-                  ? 'bg-[#182030] hover:bg-[#202B40] text-amber-400 border-[#2A364E]'
-                  : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-amber-600 border-[#C6D0DC] shadow-2xs'
-              }`}
-              title="Schedule daily update requests (Alarm Clock)"
-              aria-label="Schedule daily update requests"
+              onClick={() => setSidebarMobileOpen(true)}
+              className="p-1.5 rounded-md text-secondary hover:text-primary hover:bg-surface-hover lg:hidden cursor-pointer"
+              aria-label="Toggle sidebar"
             >
-              <Clock className="w-4 h-4 text-amber-400" />
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-          )}
 
-          {/* Search in Conversation */}
-          <button
-            onClick={() => setInChatSearchOpen(!inChatSearchOpen)}
-            className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
-              inChatSearchOpen
-                ? 'bg-[#1C2638] text-white border-[#2D3C54] shadow-xs'
-                : isDark
-                ? 'bg-[#182030] hover:bg-[#202B40] text-slate-300 border-[#2A364E]'
-                : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-slate-700 border-[#C6D0DC] shadow-2xs'
-            }`}
-            title="Search conversation (⌘F)"
-            aria-label="Search conversation"
-          >
-            <Search className="w-4 h-4 text-slate-400" />
-          </button>
+            {isDm ? (
+              <button
+                type="button"
+                onClick={() => otherUser && setProfileModalUser?.(otherUser)}
+                className="flex items-center gap-2 sm:gap-3.5 min-w-0 cursor-pointer group text-left focus:outline-none"
+                title={`View ${otherUser?.name || 'User'}'s profile`}
+                aria-label={`View ${otherUser?.name || 'User'}'s profile`}
+              >
+                <Avatar
+                  user={otherUser || ({ name: headerTitle, status: 'online', team: 'team_ai' } as any)}
+                  size="md"
+                  showStatus={true}
+                  className="group-hover:ring-2 group-hover:ring-accent/40 rounded-full transition-all"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1
+                      className="font-semibold text-base tracking-tight truncate text-primary group-hover:underline"
+                      style={isDm && otherUser ? { color: getUserNameColor(otherUser.id, otherUser.name) } : undefined}
+                    >
+                      {headerTitle}
+                    </h1>
+                  </div>
+                  <div className="text-xs text-muted flex items-center gap-2 mt-0.5 truncate">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span>@{otherUser?.handle || 'user'}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <span className={`h-2 w-2 rounded-full ${
+                          otherUser?.status === 'online'
+                            ? 'bg-emerald-500 ring-1 ring-emerald-500/20'
+                            : otherUser?.status === 'busy'
+                            ? 'bg-rose-500 ring-1 ring-rose-500/20'
+                            : 'bg-slate-400 dark:bg-zinc-500'
+                        }`} />
+                        <span className={`font-normal ${
+                          otherUser?.status === 'online'
+                            ? 'text-emerald-500 font-medium'
+                            : otherUser?.status === 'busy'
+                            ? 'text-rose-500 font-medium'
+                            : 'text-slate-400 dark:text-zinc-500'
+                        }`}>
+                          {otherUser?.status === 'online' ? 'Online' : otherUser?.status === 'busy' ? 'Busy' : 'Offline'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <>
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center font-bold text-sm bg-surface border border-subtle text-secondary">
+                  {isAnnouncement ? <Megaphone className="h-4 w-4" /> : isUpdates ? <Sparkles className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
+                </div>
 
-          {/* Unified Details Panel Toggle (Pins, Files, Members) */}
-          <button
-            onClick={() => setPinnedDrawerOpen(!pinnedDrawerOpen)}
-            className={`relative w-8 h-8 flex items-center justify-center rounded-md transition-colors border ${
-              pinnedDrawerOpen
-                ? 'bg-[#1C2638] text-white border-[#2D3C54] shadow-xs'
-                : isDark
-                ? 'bg-[#182030] hover:bg-[#202B40] text-slate-300 border-[#2A364E]'
-                : 'bg-[#EAEFF5] hover:bg-[#DEE5EE] text-slate-700 border-[#C6D0DC] shadow-2xs'
-            }`}
-            title="Conversation details"
-            aria-label="Conversation details"
-          >
-            <PanelRight className="w-4 h-4 text-slate-400" />
-            {pinnedCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-1 rounded-full text-[9px] font-mono font-bold bg-amber-500 text-slate-900 flex items-center justify-center shadow-xs">
-                {pinnedCount}
-              </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-semibold text-base tracking-tight truncate text-primary">
+                      {headerTitle}
+                    </h1>
+                  </div>
+                  <div className="text-xs text-muted flex items-center gap-2 mt-0.5 truncate">
+                    <span className="truncate">{headerSubtitle}</span>
+                  </div>
+                </div>
+              </>
             )}
-          </button>
-        </div>
-      </header>
-
-      {/* WhatsApp-style Desktop Notification Prompt Banner */}
-      {desktopNotificationPermission === 'default' && !bannerDismissed && (
-        <div className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs border-b ${
-          isDark
-            ? 'bg-[#1A2333] border-[#2A364E] text-slate-200'
-            : 'bg-blue-50 border-blue-200 text-blue-900'
-        }`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-              <Bell className="w-3.5 h-3.5" />
-            </div>
-            <span className="truncate">
-              Get notified of new personal messages with <strong>Windows desktop popups</strong>.
-            </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Windows Desktop Notifications Quick Toggle */}
             <button
               onClick={async () => {
-                const res = await requestDesktopNotificationPermission?.();
-                if (res === 'granted') {
+                if (desktopNotificationPermission === 'granted') {
+                  sendTestDesktopNotification?.();
                   addToast?.({
-                    type: 'success',
-                    title: 'Windows Notifications Enabled',
-                    description: 'A test popup has been dispatched to your screen.'
+                    type: 'info',
+                    title: 'Windows Notification Sent',
+                    description: 'Look at the bottom-right of your Windows desktop for the popup.'
                   });
+                } else if (desktopNotificationPermission === 'denied') {
+                  addToast?.({
+                    type: 'warning',
+                    title: 'Notifications Blocked',
+                    description: 'Please click the site permissions icon in your browser address bar to enable notifications.'
+                  });
+                } else {
+                  const res = await requestDesktopNotificationPermission?.();
+                  if (res === 'granted') {
+                    addToast?.({
+                      type: 'success',
+                      title: 'Windows Notifications Enabled',
+                      description: 'You will now receive desktop popups for incoming direct messages.'
+                    });
+                  }
                 }
               }}
-              className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors shadow-xs cursor-pointer"
+              className="relative h-8 w-8 flex items-center justify-center rounded-md transition-colors border border-subtle bg-surface text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+              title={
+                desktopNotificationPermission === 'granted'
+                  ? 'Windows Notifications: Active (Click to send test popup)'
+                  : desktopNotificationPermission === 'denied'
+                  ? 'Windows Notifications: Blocked in browser settings'
+                  : 'Enable Windows Desktop Notifications'
+              }
+              aria-label="Windows desktop notifications"
             >
-              Turn on desktop notifications
-            </button>
-            <button
-              onClick={() => setBannerDismissed(true)}
-              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-              title="Dismiss"
-              aria-label="Dismiss notification prompt"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* In-Chat Search Bar */}
-      <InChatSearchBar
-        isOpen={inChatSearchOpen}
-        onClose={() => setInChatSearchOpen(false)}
-        onSelectMessage={id => {
-          setSelectedMessageId(id);
-          const el = document.getElementById(`msg-${id}`);
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }}
-        currentMatchIndex={0}
-        matchingMessageIds={[]}
-      />
-
-      {/* 2. Main Content: Locked State or Message Stream & Composer */}
-      {!isCurrentConversationAccessible ? (
-        <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center ${isDark ? 'bg-[#18181B]' : 'bg-[#F8F9FA]'}`}>
-          <div className="w-16 h-16 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 mb-4 shadow-lg">
-            <Lock className="w-8 h-8" />
-          </div>
-          <h2 className={`text-lg font-bold tracking-tight mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            You are not authorized to access this
-          </h2>
-          <p className={`text-xs max-w-md leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'} mb-6`}>
-            {inaccessibilityReason || 'Access to this channel is restricted by Role-Based Access Control (RBAC). Only members of this department and Main Admin (CEO) have access.'}
-          </p>
-          <button
-            onClick={() => {
-              const myChan = getUserDepartmentChannel(channels, currentUser);
-              setActiveConversationId(myChan);
-            }}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:brightness-110"
-          >
-            <span>Go to My Department</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* 2. Chat Message Stream */}
-          <div
-            ref={scrollContainerRef}
-            onScroll={handleScroll}
-            className={`relative flex-1 overflow-y-auto px-4 sm:px-6 py-4 ${isDark ? 'bg-[#121620]' : 'bg-[#D8DFE7]'}`}
-          >
-            <div ref={messagesContentRef} className="space-y-4 pb-6">
-              {/* Empty State when no messages */}
-              {currentMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center p-8 my-10">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 shadow-2xs ${
-                    isDark ? 'bg-[#131B2E] border border-[#1E293B] text-blue-400' : 'bg-blue-50 border border-blue-100 text-blue-600'
-                  }`}>
-                    {isAnnouncement ? <Megaphone className="w-6 h-6" /> : isUpdates ? <Sparkles className="w-6 h-6" /> : <Hash className="w-6 h-6" />}
-                  </div>
-                  <h2 className="font-bold text-base">
-                    {isDm ? `Direct Message with ${headerTitle}` : `Welcome to ${headerTitle}`}
-                  </h2>
-                  <p className={`text-xs max-w-sm mt-1 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {isDm
-                      ? `This is the direct end-to-end encrypted thread with ${headerTitle}.`
-                      : headerSubtitle}
-                  </p>
-                  <p className={`text-[11px] mt-2 font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {isAnnouncement && currentUser.role !== 'main_admin'
-                      ? 'Only Main-Admin (CEO) has posting authorization in this channel.'
-                      : 'Send a message below to start collaborating.'}
-                  </p>
-                </div>
+              {desktopNotificationPermission === 'denied' ? (
+                <BellOff className="h-4 w-4" />
               ) : (
-                currentMessages.map((msg: any, index: number) => {
-                  const sender = users.find(u => u.id === msg.senderId) || currentUser;
-                  const prevMsg = currentMessages[index - 1];
-                  const isFirstOfDay = !prevMsg || getDayKey(prevMsg.timestamp) !== getDayKey(msg.timestamp);
-
-                  return (
-                    <React.Fragment key={msg.id}>
-                      {isFirstOfDay && (
-                        <div className="flex items-center justify-center my-3">
-                          <span className={`px-3.5 py-1 rounded-full font-semibold text-[11px] uppercase tracking-wider shadow-2xs ${
-                            isDark ? 'bg-[#182030] text-slate-300 border border-[#253248]' : 'bg-[#EAEFF5] text-slate-700 border border-[#C6D0DC] shadow-xs'
-                          }`}>
-                            {formatDateDivider(msg.timestamp)}
-                          </span>
-                        </div>
-                      )}
-                      <MessageItem
-                        message={msg}
-                        sender={sender}
-                        isOwnMessage={msg.senderId === currentUser.id}
-                        isHighlighted={msg.id === selectedMessageId}
-                      />
-                    </React.Fragment>
-                  );
-                })
+                <Bell className="h-4 w-4" />
               )}
-              <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+              {desktopNotificationPermission === 'granted' && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" />
+              )}
+              {desktopNotificationPermission === 'default' && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-muted" />
+              )}
+            </button>
+
+            {/* Notification Preferences Modal Toggle */}
+            <button
+              onClick={() => setNotificationSettingsModalOpen?.(true)}
+              className="h-8 w-8 flex items-center justify-center rounded-md transition-colors border border-subtle bg-surface text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+              title="Notification preferences & privacy"
+              aria-label="Notification preferences"
+            >
+              <Sliders className="h-3.5 w-3.5 text-secondary" />
+            </button>
+
+            {/* Main-Admin Schedule Daily Updates Action in #updates */}
+            {isUpdates && currentUser?.role === 'main_admin' && (
+              <button
+                onClick={() => setScheduleUpdateModalOpen(true)}
+                className="h-8 w-8 flex items-center justify-center rounded-md transition-colors border border-subtle bg-surface text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                title="Schedule daily update requests (Alarm Clock)"
+                aria-label="Schedule daily update requests"
+              >
+                <Clock className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Search in Conversation */}
+            <button
+              onClick={() => setInChatSearchOpen(!inChatSearchOpen)}
+              className={`h-8 w-8 flex items-center justify-center rounded-md transition-colors border cursor-pointer ${
+                inChatSearchOpen
+                  ? 'bg-surface-hover text-primary border-focus'
+                  : 'bg-surface text-secondary hover:text-primary hover:bg-surface-hover border-subtle'
+              }`}
+              title="Search conversation (⌘F)"
+              aria-label="Search conversation"
+            >
+              <Search className="h-4 w-4 text-secondary" />
+            </button>
+
+            {/* Unified Details Panel Toggle (Pins, Files, Members) */}
+            <button
+              onClick={() => setPinnedDrawerOpen(!pinnedDrawerOpen)}
+              className={`relative h-8 w-8 flex items-center justify-center rounded-md transition-colors border cursor-pointer ${
+                pinnedDrawerOpen
+                  ? 'bg-surface-hover text-primary border-focus'
+                  : 'bg-surface text-secondary hover:text-primary hover:bg-surface-hover border-subtle'
+              }`}
+              title="Conversation details"
+              aria-label="Conversation details"
+            >
+              <PanelRight className="h-4 w-4 text-secondary" />
+              {pinnedCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-3.5 px-1 rounded-full text-xs font-mono font-bold bg-accent text-white flex items-center justify-center">
+                  {pinnedCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Desktop Notification Prompt Banner */}
+        {desktopNotificationPermission === 'default' && !bannerDismissed && (
+          <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs border-b border-subtle bg-surface text-primary">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-6 w-6 rounded-full bg-surface-hover text-secondary flex items-center justify-center shrink-0 border border-subtle">
+                <Bell className="h-3.5 w-3.5" />
+              </div>
+              <span className="truncate">
+                Get notified of new personal messages with <strong>Windows desktop popups</strong>.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={async () => {
+                  const res = await requestDesktopNotificationPermission?.();
+                  if (res === 'granted') {
+                    addToast?.({
+                      type: 'success',
+                      title: 'Windows Notifications Enabled',
+                      description: 'A test popup has been dispatched to your screen.'
+                    });
+                  }
+                }}
+                className="px-2.5 py-1 rounded-md bg-accent hover:bg-accent-hover text-white font-medium transition-colors cursor-pointer"
+              >
+                Turn on desktop notifications
+              </button>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="p-1 rounded text-muted hover:text-primary transition-colors cursor-pointer"
+                title="Dismiss"
+                aria-label="Dismiss notification prompt"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* In-Chat Search Bar */}
+        <InChatSearchBar
+          isOpen={inChatSearchOpen}
+          onClose={() => setInChatSearchOpen(false)}
+          onSelectMessage={id => {
+            setSelectedMessageId(id);
+            const el = document.getElementById(`msg-${id}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+          currentMatchIndex={0}
+          matchingMessageIds={[]}
+        />
+
+        {/* 2. Main Content: Locked State or Message Stream & Composer */}
+        {!isCurrentConversationAccessible ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-canvas">
+            <div className="h-16 w-16 rounded-2xl bg-surface-hover border border-subtle flex items-center justify-center text-muted mb-4 shadow-sm">
+              <Lock className="h-8 w-8" />
+            </div>
+            <h2 className="text-lg font-bold tracking-tight mb-2 text-primary">
+              You are not authorized to access this
+            </h2>
+            <p className="text-xs max-w-md leading-relaxed text-secondary mb-6">
+              {inaccessibilityReason || 'Access to this channel is restricted by Role-Based Access Control (RBAC). Only members of this department and Main Admin (CEO) have access.'}
+            </p>
+            <button
+              onClick={() => {
+                const myChan = getUserDepartmentChannel(channels, currentUser);
+                setActiveConversationId(myChan);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+            >
+              <span>Go to My Department</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* 2. Chat Message Stream */}
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4 bg-transparent custom-scrollbar"
+            >
+              <div ref={messagesContentRef} className="space-y-4 pb-6">
+                {/* Empty State when no messages */}
+                {currentMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center p-8 my-10">
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-3 bg-surface border border-subtle text-secondary">
+                      {isAnnouncement ? <Megaphone className="h-6 w-6" /> : isUpdates ? <Sparkles className="h-6 w-6" /> : <Hash className="h-6 w-6" />}
+                    </div>
+                    <h2 className="font-bold text-base text-primary">
+                      {isDm ? `Direct Message with ${headerTitle}` : `Welcome to ${headerTitle}`}
+                    </h2>
+                    <p className="text-xs max-w-sm mt-1 leading-relaxed text-secondary">
+                      {isDm
+                        ? `This is the direct end-to-end encrypted thread with ${headerTitle}.`
+                        : headerSubtitle}
+                    </p>
+                    <p className="text-xs mt-2 font-mono text-muted">
+                      {isAnnouncement && currentUser.role !== 'main_admin'
+                        ? 'Only Main-Admin (CEO) has posting authorization in this channel.'
+                        : 'Send a message below to start collaborating.'}
+                    </p>
+                  </div>
+                ) : (
+                  currentMessages.map((msg: any, index: number) => {
+                    const sender = users.find(u => u.id === msg.senderId) || currentUser;
+                    const prevMsg = currentMessages[index - 1];
+                    const isFirstOfDay = !prevMsg || getDayKey(prevMsg.timestamp) !== getDayKey(msg.timestamp);
+                    const isGrouped = !isFirstOfDay && Boolean(
+                      prevMsg &&
+                      prevMsg.senderId === msg.senderId &&
+                      (new Date(msg.timestamp).getTime() - new Date(prevMsg.timestamp).getTime()) < 5 * 60 * 1000
+                    );
+
+                    return (
+                      <React.Fragment key={msg.id}>
+                        {isFirstOfDay && (
+                          <div className="flex items-center justify-center my-3">
+                            <span className="px-3 py-1 rounded-full font-semibold text-xs uppercase tracking-wider bg-surface text-secondary border border-subtle">
+                              {formatDateDivider(msg.timestamp)}
+                            </span>
+                          </div>
+                        )}
+                        <MessageItem
+                          message={msg}
+                          sender={sender}
+                          isOwnMessage={msg.senderId === currentUser.id}
+                          isHighlighted={msg.id === selectedMessageId}
+                          isGrouped={isGrouped}
+                        />
+                      </React.Fragment>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
+              </div>
+
+              {/* Floating Jump to Latest Button if user scrolled up */}
+              {showScrollToBottomButton && (
+                <div className="sticky bottom-2 flex justify-end pointer-events-none pr-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      isUserScrolledUpRef.current = false;
+                      setShowScrollToBottomButton(false);
+                      executeScrollToBottom(true);
+                    }}
+                    className="pointer-events-auto px-3 py-1.5 rounded-full bg-accent hover:bg-accent-hover text-white shadow-md flex items-center gap-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer border border-subtle"
+                    aria-label="Scroll to newest messages"
+                    title="Scroll to newest messages"
+                  >
+                    <ArrowDown className="h-3.5 w-3.5 animate-bounce" />
+                    <span>Latest messages</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Floating Jump to Latest Button if user scrolled up */}
-            {showScrollToBottomButton && (
-              <div className="sticky bottom-2 flex justify-end pointer-events-none pr-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    isUserScrolledUpRef.current = false;
-                    setShowScrollToBottomButton(false);
-                    executeScrollToBottom(true);
-                  }}
-                  className="pointer-events-auto px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg flex items-center gap-1.5 text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer border border-blue-400/30 backdrop-blur-xs"
-                  aria-label="Scroll to newest messages"
-                  title="Scroll to newest messages"
-                >
-                  <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
-                  <span>Latest messages</span>
-                </button>
-              </div>
-            )}
-          </div>
+            {/* 3. Message Composer */}
+            <MessageInput />
+          </>
+        )}
 
-          {/* 3. Message Composer */}
-          <MessageInput />
-        </>
-      )}
+        {/* 4. Fast Reply Popup */}
+        <QuickReplyPopup />
 
-      {/* 4. WhatsApp-style Fast Reply Popup */}
-      <QuickReplyPopup />
-
-      {/* 5. Notification Preferences & Privacy Modal */}
-      <NotificationSettingsModal />
-    </div>
+        {/* 5. Notification Preferences & Privacy Modal */}
+        <NotificationSettingsModal />
+      </div>
+    </TooltipProvider>
   );
 };

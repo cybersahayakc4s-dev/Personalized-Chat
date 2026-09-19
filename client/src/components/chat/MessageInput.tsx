@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { Attachment, User } from '../../types';
-import { Avatar } from '../common/Avatar';
-import { getUserColor } from '../../utils/userColors';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Send,
   Paperclip,
@@ -17,15 +18,11 @@ import {
   Quote,
   X,
   FileText,
-  RefreshCw,
   AtSign,
   FileCode,
   Lock,
-  Megaphone,
   Film,
-  UserX,
-  Reply,
-  Image as ImageIcon
+  Reply
 } from 'lucide-react';
 import { applySmartFormatting, handleSmartEnter, handleFormattingShortcuts, FormatType } from '../../utils/textFormatting';
 
@@ -36,7 +33,7 @@ interface MessageInputProps {
 
 const EMOJIS = ['👍', '❤️', '🔥', '🚀', '🔒', '💡', '👀', '🎉', '👋', '🎯', '⚡', '✨'];
 
-export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyToId }) => {
+export const MessageInput: React.FC<MessageInputProps> = ({ placeholder }) => {
   const {
     activeConversationId,
     activeConversation,
@@ -45,8 +42,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
     users = [],
     sendMessage,
     replyingToMessage,
-    setReplyingToMessage,
-    theme
+    setReplyingToMessage
   } = useChat() as any;
 
   const [text, setText] = useState('');
@@ -61,10 +57,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionMenuRef = useRef<HTMLDivElement>(null);
-
   const isSubmittingRef = useRef<boolean>(false);
-
-  const isDark = theme !== 'nordic';
 
   // Clipboard paste support for screenshots / images
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -90,7 +83,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
     }
   }, [text]);
 
-  // Channel & Recipient RBAC Posting Restrictions
+  // Read-only and posting permission checks
   const otherUser = isDm ? (activeConversation as any)?.otherUser : null;
   const isDeletedRecipient = isDm && Boolean(
     otherUser?.account_status === 'deleted' ||
@@ -110,27 +103,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
   const isAnnouncement = activeConversationId === 'c-announcements';
   const isUpdates = activeConversationId === 'c-updates';
 
-  let canPost = true;
-  let restrictionMessage = '';
+  let isReadOnly = false;
+  let readOnlyMessage = "This channel is read-only.";
 
   if (isDeletedRecipient) {
-    canPost = false;
-    restrictionMessage = 'This user account has been deleted. You cannot send new messages to a deleted account.';
+    isReadOnly = true;
+    readOnlyMessage = "This user account has been deleted. You cannot send new messages.";
   } else if (isDisabledRecipient) {
-    canPost = false;
-    restrictionMessage = 'This colleague account is currently deactivated. You cannot send messages to this user.';
+    isReadOnly = true;
+    readOnlyMessage = "This user account is currently deactivated. You cannot send messages.";
   } else if (isAnnouncement && currentUser?.role !== 'main_admin') {
-    canPost = false;
-    restrictionMessage = 'Only Main-Admin (CEO) has posting authorization in #announcements. You are in read-only mode.';
+    isReadOnly = true;
+    readOnlyMessage = "This channel is read-only. Only Main-Admin (CEO) can post announcements.";
   } else if (isUpdates) {
     const isLeadOrAdmin = currentUser?.role === 'main_admin' || Boolean(currentUser?.is_team_leader) || (currentUser?.title && currentUser.title.toLowerCase().includes('lead'));
     if (!isLeadOrAdmin) {
-      canPost = false;
-      restrictionMessage = 'Only Team Leaders and Main-Admin can post updates in #updates. You are in read-only mode.';
+      isReadOnly = true;
+      readOnlyMessage = "This channel is read-only. Only Leads and Admins can post updates.";
     }
   }
 
-  // Intelligent Word-Aware Formatting (Bold, Italic, Strikethrough, Code, Lists, Quotes)
   const applyFormatting = (formatType: FormatType) => {
     if (!textareaRef.current) return;
     applySmartFormatting(textareaRef.current, text, setText, formatType);
@@ -138,112 +130,62 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
 
   const replySender = React.useMemo(() => {
     if (!replyingToMessage) return null;
-    return users.find((u: User) => u.id === replyingToMessage.senderId) || null;
+    return users.find((u: any) => u.id === replyingToMessage.senderId) || null;
   }, [replyingToMessage, users]);
 
-  useEffect(() => {
-    if (replyingToMessage && textareaRef.current) {
-      textareaRef.current.focus();
+  // Mention filtering
+  const eligibleUsers = React.useMemo(() => {
+    if (isDm || !showMentionMenu) return [];
+    const query = mentionQuery.toLowerCase();
+    return users.filter((u: any) => {
+      if (u.id === currentUser?.id) return false;
+      if (u.account_status === 'deleted' || u.status === 'deleted') return false;
+      if (!query) return true;
+      return (
+        u.name.toLowerCase().includes(query) ||
+        u.handle.toLowerCase().includes(query)
+      );
+    });
+  }, [isDm, showMentionMenu, mentionQuery, users, currentUser]);
+
+  const handleSelectMention = (user: User) => {
+    if (!user || !user.handle) {
+      setShowMentionMenu(false);
+      return;
     }
-  }, [replyingToMessage]);
-
-  const handleSend = () => {
-    if (isSubmittingRef.current || !canPost) return;
-    const trimmed = text.trim();
-    if (!trimmed && attachments.length === 0) return;
-
-    isSubmittingRef.current = true;
-    const contentToSend = text;
-    const attachmentsToSend = [...attachments];
-    const replyToSend = replyToId || replyingToMessage?.id;
-
-    setText('');
-    setAttachments([]);
-    setShowEmojiPicker(false);
-    setReplyingToMessage?.(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    const mentionTag = `@${user.handle} `;
+    const atPos = text.lastIndexOf('@');
+    if (atPos !== -1) {
+      const newText = text.substring(0, atPos) + mentionTag;
+      setText(newText);
+    } else {
+      setText(prev => prev + mentionTag);
     }
-
-    try {
-      sendMessage(contentToSend, attachmentsToSend, replyToSend);
-    } finally {
-      setTimeout(() => {
-        isSubmittingRef.current = false;
-      }, 350);
-    }
+    setShowMentionMenu(false);
+    setMentionQuery('');
+    textareaRef.current?.focus();
   };
 
-  // Eligible members to mention in current conversation
-  const eligibleUsers: User[] = React.useMemo(() => {
-    if (isDm) return [];
-    const teamChan = (activeConversation as any)?.team;
-    let pool = users.filter((u: User) => u.id !== currentUser.id);
-    if (teamChan) {
-      const teamPool = pool.filter((u: User) => u.team === teamChan || u.role === 'main_admin');
-      if (teamPool.length > 0) pool = teamPool;
-    }
-    if (!mentionQuery) return pool;
-    const q = mentionQuery.toLowerCase();
-    return pool.filter(
-      (u: User) =>
-        (u.name && u.name.toLowerCase().includes(q)) ||
-        (u.handle && u.handle.toLowerCase().includes(q))
-    );
-  }, [users, currentUser.id, isDm, activeConversation, mentionQuery]);
-
-  // Track text changes and detect '@'
   const handleTextChange = (val: string) => {
     setText(val);
-    if (!textareaRef.current) return;
-
-    const cursorPos = textareaRef.current.selectionStart || val.length;
-    const textBeforeCursor = val.slice(0, cursorPos);
-    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
-
-    if (lastAtIdx !== -1) {
-      // Must be at start or preceded by whitespace
-      const charBeforeAt = lastAtIdx > 0 ? textBeforeCursor[lastAtIdx - 1] : ' ';
-      const queryAfterAt = textBeforeCursor.slice(lastAtIdx + 1);
-
-      if (/\s/.test(charBeforeAt) && !/\s/.test(queryAfterAt)) {
-        setMentionQuery(queryAfterAt);
+    if (!isDm) {
+      const cursor = textareaRef.current?.selectionStart ?? val.length;
+      const textUpToCursor = val.slice(0, cursor);
+      const atMatch = textUpToCursor.match(/@([a-zA-Z0-9_-]*)$/);
+      if (atMatch) {
         setShowMentionMenu(true);
+        setMentionQuery(atMatch[1]);
         setMentionIndex(0);
-        return;
+      } else {
+        setShowMentionMenu(false);
       }
-    }
-
-    setShowMentionMenu(false);
-  };
-
-  // Insert selected mention
-  const handleSelectMention = (user: User) => {
-    if (!textareaRef.current) return;
-    const cursorPos = textareaRef.current.selectionStart || text.length;
-    const textBeforeCursor = text.slice(0, cursorPos);
-    const textAfterCursor = text.slice(cursorPos);
-    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
-
-    if (lastAtIdx !== -1) {
-      const prefix = textBeforeCursor.slice(0, lastAtIdx);
-      const mentionText = `@${user.handle} `;
-      const nextText = `${prefix}${mentionText}${textAfterCursor}`;
-      setText(nextText);
+    } else if (showMentionMenu) {
       setShowMentionMenu(false);
-
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          const newPos = prefix.length + mentionText.length;
-          textareaRef.current.setSelectionRange(newPos, newPos);
-        }
-      }, 50);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // 0. Handle mention dropdown navigation
+    // Navigate mention popup
     if (showMentionMenu && eligibleUsers.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -257,9 +199,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        const chosen = eligibleUsers[mentionIndex] || eligibleUsers[0];
-        if (chosen) {
-          handleSelectMention(chosen);
+        const targetUser = eligibleUsers[mentionIndex];
+        if (targetUser) {
+          handleSelectMention(targetUser);
+        } else {
+          setShowMentionMenu(false);
         }
         return;
       }
@@ -270,96 +214,68 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
       }
     }
 
-    // 1. Formatting keyboard shortcuts: Ctrl/Cmd + B, I, Shift+X, E
-    if (textareaRef.current && handleFormattingShortcuts(e, textareaRef.current, text, setText)) {
-      return;
+    // Keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+K)
+    const handledShortcut = handleFormattingShortcuts(e, textareaRef.current, text, setText);
+    // Smart Enter (Shift+Enter adds newline; Enter sends)
+    if (textareaRef.current) {
+      const isHandled = handleSmartEnter(e, textareaRef.current, text, setText);
+      if (isHandled) return;
     }
 
-    // Escape cancels active reply
-    if (e.key === 'Escape' && replyingToMessage) {
-      e.preventDefault();
-      setReplyingToMessage?.(null);
-      return;
-    }
-
-    // 2. Enter key handling: lists/quotes auto-continue vs send message
     if (e.key === 'Enter' && !e.shiftKey) {
-      if (e.repeat || e.nativeEvent.isComposing) {
-        e.preventDefault();
-        return;
-      }
-      // Check if current line is a bullet/numbered list or quote that should continue or cleanly exit
-      if (textareaRef.current && handleSmartEnter(e, textareaRef.current, text, setText)) {
-        return;
-      }
       e.preventDefault();
       handleSend();
-      return;
     }
   };
 
-  // If user cannot post due to channel RBAC restriction or deleted recipient
-  if (!canPost) {
+  const handleSend = async () => {
+    const trimmed = text.trim();
+    if (!trimmed && attachments.length === 0) return;
+    if (isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    const currentAttachments = [...attachments];
+    const currentReplyId = replyingToMessage?.id;
+
+    setText('');
+    setAttachments([]);
+    setReplyingToMessage(null);
+    setShowEmojiPicker(false);
+    setShowMentionMenu(false);
+
+    try {
+      await sendMessage(trimmed, currentAttachments, currentReplyId);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    } finally {
+      isSubmittingRef.current = false;
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+    }
+  };
+
+  // 1. Read-Only State Handling (NEW-DESIGN.md Section 4.2)
+  if (isReadOnly) {
     return (
-      <div className={`p-4 border-t transition-colors ${
-        isDark ? 'border-[#222C3E] bg-[#121620]' : 'border-slate-300 bg-slate-100'
-      }`}>
-        <div className={`flex items-center gap-3 p-3.5 rounded-xl text-xs font-medium border shadow-xs ${
-          isDeletedRecipient
-            ? isDark
-              ? 'bg-rose-950/40 border-rose-800/50 text-rose-200'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
-            : isDisabledRecipient
-            ? isDark
-              ? 'bg-amber-950/40 border-amber-800/50 text-amber-200'
-              : 'bg-amber-50 border-amber-200 text-amber-800'
-            : isAnnouncement
-            ? isDark
-              ? 'bg-amber-950/40 border-amber-800/50 text-amber-200'
-              : 'bg-amber-50 border-amber-200 text-amber-800'
-            : isDark
-            ? 'bg-blue-950/40 border-blue-800/50 text-blue-200'
-            : 'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-            isDeletedRecipient
-              ? isDark ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-200 text-rose-700'
-              : isDisabledRecipient || isAnnouncement
-              ? isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-200 text-amber-700'
-              : isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-200 text-blue-700'
-          }`}>
-            {isDeletedRecipient || isDisabledRecipient ? (
-              <UserX className="w-4 h-4" />
-            ) : isAnnouncement ? (
-              <Megaphone className="w-4 h-4" />
-            ) : (
-              <Lock className="w-4 h-4" />
-            )}
-          </div>
-          <div className="leading-relaxed">
-            <span className="font-bold tracking-tight">
-              {isDeletedRecipient
-                ? 'Account Deleted: '
-                : isDisabledRecipient
-                ? 'Account Deactivated: '
-                : 'Channel Access Restricted: '}
-            </span>
-            <span>{restrictionMessage}</span>
-          </div>
+      <div className="p-4 border-t border-subtle bg-canvas shrink-0">
+        <div className="w-full p-3 rounded-lg border border-subtle bg-surface-hover flex items-center justify-center gap-2 text-muted text-sm">
+          <Lock size={16} />
+          <span>{readOnlyMessage}</span>
         </div>
       </div>
     );
   }
 
   const recipientName = isDm
-    ? (activeConversation as any)?.otherUser?.name || 'Team Colleague'
-    : (activeConversation as any)?.name || 'AI Team';
+    ? (activeConversation as any)?.otherUser?.name || 'Colleague'
+    : (activeConversation as any)?.name || 'channel';
 
-  const defaultPlaceholder = `Message ${isDm ? recipientName : '#' + recipientName} or type / to link task, doc, or PR...`;
+  const defaultPlaceholder = `Message ${isDm ? recipientName : '#' + recipientName}...`;
 
   return (
-    <div className={`p-4 ${isDark ? 'bg-[#121620] border-t border-[#222C3E]' : 'bg-[#D8DFE7] border-t border-[#C6D0DC]'} transition-colors`}>
-      {/* File input (hidden) */}
+    <div className="p-4 border-t border-subtle bg-canvas/60 backdrop-blur-xs shrink-0">
+      {/* Hidden File Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -381,45 +297,37 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
         }}
       />
 
-      {/* Attachment previews */}
+      {/* Attachment Previews */}
       {attachments.length > 0 && (
-        <div className="mb-2.5 flex flex-wrap gap-2.5">
+        <div className="mb-2 flex flex-wrap gap-2">
           {attachments.map(att => {
             const isImg = att.type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(att.name);
             const isVid = att.type?.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(att.name);
+
             return (
               <div
                 key={att.id}
-                className={`relative group flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs border transition shadow-xs ${
-                  isDark ? 'bg-[#182030] border-[#2E3C52] text-slate-200' : 'bg-white border-slate-300 text-slate-800'
-                }`}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs border border-subtle bg-surface text-primary"
               >
                 {isImg ? (
-                  <img
-                    src={att.url}
-                    alt={att.name}
-                    className="w-10 h-10 object-cover rounded-md border border-slate-600/30 flex-shrink-0"
-                  />
+                  <img src={att.url} alt={att.name} className="h-8 w-8 object-cover rounded" />
                 ) : isVid ? (
-                  <div className="w-10 h-10 rounded-md bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0">
-                    <Film className="w-5 h-5" />
-                  </div>
+                  <Film className="h-4 w-4 text-secondary" />
                 ) : (
-                  <div className="w-10 h-10 rounded-md bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
-                    <FileText className="w-5 h-5" />
-                  </div>
+                  <FileText className="h-4 w-4 text-secondary" />
                 )}
-                <div className="min-w-0 max-w-[140px]">
-                  <p className={`truncate font-mono text-[11px] font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{att.name}</p>
-                  <p className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{(att.size / 1024).toFixed(1)} KB</p>
+                <div className="flex flex-col min-w-0 max-w-xs">
+                  <span className="truncate text-xs font-medium">{att.name}</span>
+                  <span className="text-xs text-muted">{(att.size / 1024).toFixed(1)} KB</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}
-                  className={`ml-1 p-1 rounded transition ${isDark ? 'text-slate-400 hover:text-rose-400' : 'text-slate-500 hover:text-rose-600'}`}
-                  title="Remove file"
+                  className="p-1 text-muted hover:text-primary rounded cursor-pointer"
+                  title="Remove attachment"
+                  aria-label="Remove attachment"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             );
@@ -429,172 +337,72 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
 
       {/* Quoted Reply Banner */}
       {replyingToMessage && (
-        <div className={`mb-2 px-3.5 py-2 rounded-xl border-l-4 border-blue-500 flex items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150 ${
-          isDark
-            ? 'bg-[#151D2C] border border-[#273549] border-l-blue-500 text-slate-200'
-            : 'bg-blue-50/90 border border-blue-200 border-l-blue-600 text-slate-800'
-        }`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0">
-              <Reply className="w-3.5 h-3.5" />
-            </div>
-            <div className="min-w-0">
-              <span className="font-semibold text-xs text-blue-500 mr-2">
-                Replying to {replySender?.name || 'Message'}:
-              </span>
-              <span className="italic truncate text-[11.5px] opacity-85 inline-block max-w-[280px] sm:max-w-[480px] align-bottom">
-                {replyingToMessage.content || (replyingToMessage.attachments?.length ? `[Attachment: ${replyingToMessage.attachments[0].name}]` : 'Message')}
-              </span>
-            </div>
+        <div className="mb-2 px-3 py-1.5 rounded-md border-l-2 border-accent bg-surface-hover flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Reply className="h-3.5 w-3.5 text-accent shrink-0" />
+            <span className="font-semibold text-accent truncate shrink-0">
+              Replying to {replySender?.name || 'Message'}:
+            </span>
+            <span className="truncate text-secondary italic">
+              {replyingToMessage.content || '[Attachment]'}
+            </span>
           </div>
           <button
             type="button"
             onClick={() => setReplyingToMessage(null)}
-            className="p-1 rounded-md text-slate-400 hover:text-rose-400 hover:bg-slate-700/40 transition cursor-pointer flex-shrink-0"
-            title="Cancel reply (Esc)"
+            className="p-1 rounded text-muted hover:text-primary transition-colors shrink-0 cursor-pointer"
+            title="Cancel reply"
+            aria-label="Cancel reply"
           >
-            <X className="w-4 h-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
-      {/* Floating Card Container (Elevated Surface #182030 in dark mode) */}
+      {/* Active State Handling: Container */}
       <div className="relative">
-        {/* Interactive @ Mention Autocomplete Popover (Positioned above composer with high z-index) */}
+        {/* @ Mention Autocomplete Popover */}
         {showMentionMenu && eligibleUsers.length > 0 && (
           <div
             ref={mentionMenuRef}
-            className={`absolute bottom-full left-0 mb-3 w-[min(18rem,calc(100vw-2rem))] max-w-xs sm:w-72 max-h-64 overflow-y-auto rounded-xl border shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
-              isDark
-                ? 'bg-[#141C2E] border-[#2A364E] text-slate-200'
-                : 'bg-white border-[#BCC7D6] text-slate-800 shadow-lg'
-            }`}
+            className="absolute bottom-full left-0 mb-2 w-64 max-h-60 overflow-y-auto rounded-md border border-subtle bg-surface p-1 shadow-md z-30"
           >
-            <div className={`px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between ${
-              isDark ? 'border-[#202B3E] text-slate-400 bg-[#0F1626]' : 'border-slate-100 text-slate-500 bg-slate-50'
-            }`}>
-              <span>Mention Member</span>
-              <span className="font-mono text-[9px] lowercase opacity-60">↑↓ to navigate • enter to select</span>
+            <div className="px-2 py-1 text-xs font-medium text-muted uppercase tracking-wider">
+              Mention Member
             </div>
-            <div className="p-1.5 space-y-0.5">
-              {eligibleUsers.slice(0, 10).map((u, idx) => {
-                const isSelected = idx === mentionIndex;
-                const uColor = getUserColor(u.id, u.name);
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelectMention(u);
-                    }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                      isSelected
-                        ? isDark
-                          ? 'bg-blue-600/30 text-white border border-blue-500/50 shadow-xs'
-                          : 'bg-blue-50 text-blue-900 border border-blue-300 shadow-xs'
-                        : isDark
-                        ? 'hover:bg-slate-800/60 text-slate-300'
-                        : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <Avatar user={u} size="xs" showStatus={false} />
-                    <div className="min-w-0 text-left flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold truncate" style={{ color: uColor }}>
-                          {u.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 truncate font-mono">
-                          @{u.handle}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {eligibleUsers.slice(0, 8).map((u, idx) => {
+              const isSelected = idx === mentionIndex;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    handleSelectMention(u);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
+                    isSelected ? 'bg-surface-hover text-primary' : 'text-secondary hover:bg-surface-hover hover:text-primary'
+                  }`}
+                >
+                  <Avatar className="h-5 w-5 rounded-sm text-xs">
+                    <AvatarImage src={u.avatarUrl || u.avatar} />
+                    <AvatarFallback className="rounded-sm bg-surface-hover text-secondary text-xs">
+                      {u.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-medium text-primary">{u.name}</span>
+                    <span className="text-muted">@{u.handle}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <div className={`border ${isDark ? 'border-[#263348] bg-[#182030] focus-within:border-[#3B82F6]' : 'border-[#BCC7D6] bg-[#E8EEF5] focus-within:border-blue-500 shadow-xs'} rounded-lg transition`}>
-        {/* Top Formatting Bar */}
-        <div className={`flex items-center justify-between px-3 py-1.5 border-b overflow-x-auto gap-2 ${isDark ? 'border-[#263348] bg-[#182030] text-slate-300' : 'border-[#C6D0DC] bg-[#E8EEF5] text-slate-700'} text-xs`}>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => applyFormatting('bold')}
-              className={`p-1 rounded font-bold transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Bold (⌘B or **text**)"
-            >
-              <Bold className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('italic')}
-              className={`p-1 rounded italic transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Italic (⌘I or *text*)"
-            >
-              <Italic className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('strikethrough')}
-              className={`p-1 rounded transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Strikethrough (⌘+Shift+X or ~~text~~)"
-            >
-              <Strikethrough className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('code')}
-              className={`p-1 rounded font-mono text-xs transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Inline Code (`code`)"
-            >
-              <Code className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('link')}
-              className={`p-1 rounded transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Hyperlink ([label](url))"
-            >
-              <Link className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('bullet')}
-              className={`p-1 rounded transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Bullet List"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('ordered')}
-              className={`p-1 rounded transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Numbered List"
-            >
-              <ListOrdered className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => applyFormatting('quote')}
-              className={`p-1 rounded transition ${isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'}`}
-              title="Quote Block"
-            >
-              <Quote className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1 text-[11px] text-emerald-500">
-            <RefreshCw className="w-3 h-3 animate-spin-reverse" />
-            <span className="font-mono text-[10px]">Synced</span>
-          </div>
-        </div>
-
         {/* Emoji Selector Bar */}
         {showEmojiPicker && (
-          <div className={`px-3 py-1.5 border-b ${isDark ? 'bg-slate-900 border-[#1E293B]' : 'bg-slate-50 border-slate-100'} flex items-center gap-1.5`}>
+          <div className="absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-md border border-subtle bg-surface p-1 shadow-md z-20">
             {EMOJIS.map(emoji => (
               <button
                 key={emoji}
@@ -603,7 +411,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
                   setText(prev => prev + emoji);
                   setShowEmojiPicker(false);
                 }}
-                className="text-sm p-1 hover:scale-125 transition"
+                className="h-7 w-7 rounded hover:bg-surface-hover flex items-center justify-center text-sm transition-transform hover:scale-110 cursor-pointer"
               >
                 {emoji}
               </button>
@@ -611,8 +419,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
           </div>
         )}
 
-        {/* Textarea Input Container */}
-        <div className="p-3">
+        {/* Composer Box (Active State per NEW-DESIGN.md Section 4.2) */}
+        <div className="border border-subtle bg-surface focus-within:border-focus rounded-lg p-3 transition-colors">
+          {/* Textarea */}
           <textarea
             ref={textareaRef}
             value={text}
@@ -620,78 +429,231 @@ export const MessageInput: React.FC<MessageInputProps> = ({ placeholder, replyTo
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             placeholder={placeholder || defaultPlaceholder}
-            className={`w-full bg-transparent ${isDark ? 'text-white placeholder-slate-400' : 'text-slate-900 placeholder-slate-500'} text-sm leading-relaxed focus:outline-none resize-none max-h-40 min-h-[48px] block font-sans`}
+            className="w-full bg-transparent resize-none outline-none text-sm text-primary placeholder:text-muted font-sans min-h-12 max-h-40 block"
             rows={1}
           />
-        </div>
 
-        {/* Bottom Action Bar */}
-        <div className={`flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 px-3 py-2 ${isDark ? 'bg-[#141B28] border-t border-[#263348]' : 'bg-[#DFE5EE] border-t border-[#C6D0DC]'}`}>
-          <div className="flex items-center gap-1.5 sm:gap-2 text-slate-500 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-              title="Attach File"
-            >
-              <Paperclip className="w-3.5 h-3.5" />
-              <span>Attach File</span>
-            </button>
+          {/* Bottom Action Row */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-subtle">
+            {/* Formatting & Attachment Action Buttons */}
+            <div className="flex items-center gap-1 text-secondary">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('bold')}
+                    aria-label="Bold"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Bold</TooltipContent>
+              </Tooltip>
 
-            <button
-              type="button"
-              onClick={() => {
-                setText(prev => prev + '```typescript\n// code snippet\n```\n');
-              }}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-              title="Insert Snippet"
-            >
-              <FileCode className="w-3.5 h-3.5" />
-              <span>Snippet</span>
-            </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('italic')}
+                    aria-label="Italic"
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Italic</TooltipContent>
+              </Tooltip>
 
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`p-1 rounded transition ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-              title="Emoji"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('strikethrough')}
+                    aria-label="Strikethrough"
+                  >
+                    <Strikethrough className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Strikethrough</TooltipContent>
+              </Tooltip>
 
-            {/* Tag/Mention button: strictly hidden in 1:1 DMs */}
-            {!isDm && (
-              <button
-                type="button"
-                onClick={() => {
-                  const prefix = text ? (text.endsWith(' ') ? text : text + ' ') : '';
-                  handleTextChange(prefix + '@');
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-                className={`p-1 rounded transition cursor-pointer ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-                title="Mention user (@)"
-              >
-                <AtSign className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('code')}
+                    aria-label="Inline Code"
+                  >
+                    <Code className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Code</TooltipContent>
+              </Tooltip>
 
-          <div className="flex items-center gap-3">
-            <span className={`text-[11px] font-normal hidden sm:inline ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              Return to send, Shift+Return for new line
-            </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('link')}
+                    aria-label="Link"
+                  >
+                    <Link className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Link</TooltipContent>
+              </Tooltip>
 
-            <button
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('bullet')}
+                    aria-label="Bulleted List"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Bulleted List</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('ordered')}
+                    aria-label="Numbered List"
+                  >
+                    <ListOrdered className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Numbered List</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => applyFormatting('quote')}
+                    aria-label="Quote"
+                  >
+                    <Quote className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Quote</TooltipContent>
+              </Tooltip>
+
+              <div className="h-4 w-px bg-subtle mx-1" />
+
+              {/* Attachment Icon Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Attach File"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Attach File</TooltipContent>
+              </Tooltip>
+
+              {/* Snippet Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => setText(prev => prev + '```typescript\n// code snippet\n```\n')}
+                    aria-label="Code Snippet"
+                  >
+                    <FileCode className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Code Snippet</TooltipContent>
+              </Tooltip>
+
+              {/* Emoji Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    aria-label="Emoji Picker"
+                  >
+                    <Smile className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Emoji</TooltipContent>
+              </Tooltip>
+
+              {/* Mention Button (Non-DM) */}
+              {!isDm && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
+                      onClick={() => {
+                        const prefix = text ? (text.endsWith(' ') ? text : text + ' ') : '';
+                        handleTextChange(prefix + '@');
+                        setTimeout(() => textareaRef.current?.focus(), 50);
+                      }}
+                      aria-label="Mention someone"
+                    >
+                      <AtSign className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Mention Member</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Primary Send Button (NEW-DESIGN.md Section 4.2: bg-accent hover:bg-accent-hover) */}
+            <Button
               type="button"
               onClick={handleSend}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition"
+              disabled={!text.trim() && attachments.length === 0}
+              className="h-8 px-3 rounded-md bg-accent hover:bg-accent-hover text-xs font-medium text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>Send</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
+              <Send className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
-      </div>
       </div>
     </div>
   );

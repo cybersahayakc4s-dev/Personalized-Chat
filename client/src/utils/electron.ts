@@ -11,6 +11,21 @@ export interface DesktopQuickReplyData {
   isDark?: boolean;
 }
 
+export interface UpdaterProgress {
+  bytesPerSecond: number;
+  percent: number;
+  total: number;
+  transferred: number;
+}
+
+export interface UpdaterState {
+  status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  version?: string;
+  info?: any;
+  progress?: UpdaterProgress | null;
+  error?: string | null;
+}
+
 export interface ElectronAPI {
   isElectron: boolean;
   getRefreshToken: () => Promise<string | null>;
@@ -25,6 +40,13 @@ export interface ElectronAPI {
   sendQuickReplyAction?: (data: { conversationId: string; content: string }) => Promise<boolean>;
   openAppFromNotification?: (data: { conversationId: string }) => Promise<boolean>;
   onQuickReplyLoad?: (callback: (data: DesktopQuickReplyData) => void) => () => void;
+
+  // Auto-updater desktop methods
+  getAppVersion?: () => Promise<string>;
+  getUpdaterState?: () => Promise<UpdaterState>;
+  checkForUpdates?: () => Promise<{ ok: boolean; updateInfo?: any; error?: string; message?: string }>;
+  installUpdate?: () => Promise<boolean>;
+  onUpdaterStatus?: (callback: (state: UpdaterState) => void) => () => void;
 }
 
 declare global {

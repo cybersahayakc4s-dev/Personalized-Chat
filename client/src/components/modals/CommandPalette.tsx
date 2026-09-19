@@ -14,6 +14,7 @@ import {
   Command,
   Lock,
   LogIn,
+  LogOut,
   Users,
   FileText,
   Loader2,
@@ -48,7 +49,7 @@ const highlightMatch = (text: string, q: string): React.ReactNode => {
   const parts = text.split(regex);
   return parts.map((part, i) =>
     regex.test(part) ? (
-      <mark key={i} className="bg-amber-400/35 text-amber-200 font-semibold px-0.5 rounded">
+      <mark key={i} className="bg-accent-muted text-accent font-semibold px-0.5 rounded">
         {part}
       </mark>
     ) : (
@@ -67,6 +68,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     createOrOpenDm,
     setAdminModalOpen,
     setLoginModalOpen,
+    logout,
     theme,
     setTheme,
     openUnauthorizedModal,
@@ -86,7 +88,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
   const listRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isDark = theme !== 'nordic';
+  const isDark = theme !== 'light';
 
   // Focus input and reset on open
   useEffect(() => {
@@ -438,28 +440,28 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
     if (!q || 'theme'.includes(q) || 'dark'.includes(q) || 'light'.includes(q)) {
       actionItems.push({
         id: 'act-theme',
-        title: `Switch Theme: Current ${theme === 'slate' ? 'Dark (Obsidian)' : 'Light (Nordic)'}`,
-        highlightedTitle: `Switch Theme: Current ${theme === 'slate' ? 'Dark (Obsidian)' : 'Light (Nordic)'}`,
-        subtitle: 'Toggle between clean off-white Nordic and obsidian dark mode',
+        title: `Switch Theme: Current ${theme === 'dark' ? 'Dark Mode' : 'Light Mode'}`,
+        highlightedTitle: `Switch Theme: Current ${theme === 'dark' ? 'Dark Mode' : 'Light Mode'}`,
+        subtitle: 'Toggle between soft pale cobalt light mode and sleek obsidian dark mode',
         category: 'Actions',
         icon: <Palette className="w-4 h-4 text-amber-500 shrink-0" />,
         action: () => {
-          setTheme(isDark ? 'nordic' : 'slate');
+          setTheme(theme === 'dark' ? 'light' : 'dark');
           onClose();
         }
       });
     }
 
-    if (!q || 'account'.includes(q) || 'sign'.includes(q) || 'login'.includes(q) || 'user'.includes(q)) {
+    if (!q || 'sign'.includes(q) || 'out'.includes(q) || 'logout'.includes(q) || 'leave'.includes(q)) {
       actionItems.push({
-        id: 'act-login',
-        title: 'Switch Account / Sign In',
-        highlightedTitle: 'Switch Account / Sign In',
-        subtitle: 'Log in as another user or switch workspace profile',
+        id: 'act-logout',
+        title: 'Sign Out of Workspace',
+        highlightedTitle: 'Sign Out of Workspace',
+        subtitle: `End session for ${currentUser.name} (@${currentUser.handle})`,
         category: 'Actions',
-        icon: <LogIn className="w-4 h-4 text-blue-500 shrink-0" />,
+        icon: <LogOut className="w-4 h-4 text-danger shrink-0" />,
         action: () => {
-          setLoginModalOpen(true);
+          logout?.();
           onClose();
         }
       });
@@ -572,23 +574,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-2xl rounded-2xl ${
-          isDark
-            ? 'bg-[#141C2B] border-[#222E42] text-slate-100 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]'
-            : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
-        } border overflow-hidden flex flex-col max-h-[82vh] transition-all`}
+        className="w-full max-w-2xl rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] shadow-2xl overflow-hidden flex flex-col max-h-[82vh] transition-all"
         onClick={e => e.stopPropagation()}
       >
         {/* Search Input Bar */}
         <div
-          className={`p-3.5 border-b ${
-            isDark ? 'border-[#222E42] bg-[#0F1622]' : 'border-slate-100 bg-slate-50/80'
-          } flex items-center gap-3`}
+          className="p-3.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center gap-3"
         >
           {isSearchingRemote ? (
-            <Loader2 className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
+            <Loader2 className="w-5 h-5 text-[var(--brand-primary)] animate-spin shrink-0" />
           ) : (
-            <Search className="w-5 h-5 text-blue-500 shrink-0" />
+            <Search className="w-5 h-5 text-[var(--brand-primary)] shrink-0" />
           )}
           <input
             ref={inputRef}
@@ -599,33 +595,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            className={`flex-1 bg-transparent border-none outline-none text-sm font-sans ${
-              isDark ? 'text-white placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
-            }`}
+            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-hidden font-sans"
           />
           {query && (
             <button
-              onClick={() => {
-                setQuery('');
-                setSelectedIndex(0);
-                inputRef.current?.focus();
-              }}
-              className={`p-1.5 rounded-md text-xs transition-colors cursor-pointer ${
-                isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-              }`}
-              title="Clear search query"
+              onClick={() => setQuery('')}
+              className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+              title="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
           )}
           <button
-            type="button"
             onClick={onClose}
-            className={`p-1.5 rounded-md text-xs transition-colors cursor-pointer ${
-              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200 active:bg-slate-300'
-            }`}
-            title="Close command palette (Tap outside to close)"
-            aria-label="Close command palette"
+            className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -633,9 +617,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
         {/* Category Filter Chips with Live Badges */}
         <div
-          className={`px-3 py-2 border-b flex items-center justify-between gap-1.5 text-xs ${
-            isDark ? 'border-[#222E42] bg-[#111824]' : 'border-slate-100 bg-slate-50'
-          }`}
+          className="px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] flex items-center justify-between gap-1.5 text-xs"
         >
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
             {[
@@ -656,21 +638,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                   }}
                   className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                     isActive
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : isDark
-                      ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'text-secondary hover:text-primary hover:bg-surface-hover'
                   }`}
                 >
                   <span>{cat.label}</span>
                   {cat.count > 0 && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      className={`text-xs font-mono px-1.5 py-0.5 rounded-full ${
                         isActive
                           ? 'bg-white/25 text-white'
-                          : isDark
-                          ? 'bg-slate-800 text-slate-300'
-                          : 'bg-slate-200 text-slate-700'
+                          : 'bg-surface-hover text-secondary border border-subtle'
                       }`}
                     >
                       {cat.count}
@@ -684,7 +662,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
           <button
             type="button"
             onClick={onClose}
-            className="sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 active:bg-rose-500/20 text-xs font-sans font-medium shrink-0 ml-1 border border-rose-500/20 cursor-pointer"
+            className="sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-hover text-secondary active:bg-surface-hover text-xs font-sans font-medium shrink-0 ml-1 border border-subtle cursor-pointer"
             title="Close"
             aria-label="Close"
           >
@@ -696,12 +674,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         {/* Results List */}
         <div ref={listRef} className="flex-1 overflow-y-auto p-2 space-y-1.5">
           {items.length === 0 ? (
-            <div className={`py-12 text-center text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'} space-y-2`}>
+            <div className="py-12 text-center text-xs text-muted space-y-2">
               <p className="font-medium text-sm">
                 {query ? `No matches found for "${query}" in ${selectedCategory}.` : 'Search across all workspace messages, files, and channels.'}
               </p>
-              <p className="text-xs text-slate-500">
-                Try searching for keyword terms like <code className="text-blue-400 font-mono">image</code>, <code className="text-blue-400 font-mono">pdf</code>, <code className="text-blue-400 font-mono">video</code>, or channel names like <code className="text-blue-400 font-mono">#ai</code>.
+              <p className="text-xs text-muted">
+                Try searching for keyword terms like <code className="text-secondary font-mono">image</code>, <code className="text-secondary font-mono">pdf</code>, <code className="text-secondary font-mono">video</code>, or channel names like <code className="text-secondary font-mono">#ai</code>.
               </p>
             </div>
           ) : (
@@ -717,14 +695,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between gap-3 transition-colors cursor-pointer group ${
                     isSelected
-                      ? 'bg-blue-600 text-white font-medium shadow-xs'
-                      : isDark
-                      ? 'text-slate-300 hover:bg-[#1A2436] bg-[#101725]/60 border border-slate-800/40'
-                      : 'text-slate-700 hover:bg-slate-100 bg-slate-50/50 border border-slate-200/60'
+                      ? 'bg-surface-hover text-primary font-medium shadow-xs border border-focus'
+                      : 'text-primary hover:bg-surface-hover bg-surface border border-subtle'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center border border-white/5">
+                    <div className="shrink-0 w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center border border-subtle">
                       {item.icon}
                     </div>
 
@@ -732,8 +708,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                       <div className="text-xs truncate font-semibold flex items-center gap-2">
                         <span className="truncate">{item.highlightedTitle || item.title}</span>
                         {isMessage && item.hasAttachment && (
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
-                            isSelected ? 'bg-white/20 text-white' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                          <span className={`inline-flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                            isSelected ? 'bg-accent-muted text-accent border border-accent/20' : 'bg-surface-hover text-secondary border border-subtle'
                           }`}>
                             <Paperclip className="w-2.5 h-2.5" />
                             File
@@ -742,11 +718,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                       </div>
 
                       {item.subtitle && (
-                        <div
-                          className={`text-[11px] truncate mt-0.5 ${
-                            isSelected ? 'text-blue-100' : isDark ? 'text-slate-400' : 'text-slate-500'
-                          }`}
-                        >
+                        <div className="text-xs truncate mt-0.5 text-secondary">
                           {item.subtitle}
                         </div>
                       )}
@@ -763,24 +735,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
                         className={`p-1.5 rounded-md transition flex items-center gap-1 text-xs ${
                           isSelected
                             ? 'bg-white/20 text-white hover:bg-white/30'
-                            : isDark
-                            ? 'bg-slate-800 text-blue-400 hover:bg-blue-600 hover:text-white border border-slate-700/60'
-                            : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white border border-slate-200'
+                            : 'bg-[var(--bg-surface-hover)] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:text-white border border-[var(--border-subtle)]'
                         }`}
                         title="Download file"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline font-mono text-[10px]">Download</span>
+                        <span className="hidden sm:inline font-mono text-xs">Download</span>
                       </a>
                     )}
 
                     <span
-                      className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      className={`text-xs font-mono uppercase tracking-wider px-1.5 py-0.5 rounded ${
                         isSelected
                           ? 'bg-white/20 text-white'
-                          : isDark
-                          ? 'bg-slate-800 text-slate-400 border border-slate-700/50'
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          : 'bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]'
                       }`}
                     >
                       {item.category}
@@ -796,24 +764,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
 
         {/* Keyboard Footer Hint */}
         <div
-          className={`p-2.5 border-t ${
-            isDark ? 'border-[#222E42] bg-[#0E1520] text-slate-500' : 'border-slate-100 bg-slate-50 text-slate-400'
-          } flex items-center justify-between text-[11px] font-mono`}
+          className="p-2.5 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] flex items-center justify-between text-xs font-mono"
         >
           <div className="flex items-center gap-3">
             <span>
-              <kbd className={`px-1 py-0.5 rounded border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-600'}`}>↑</kbd>
-              <kbd className={`px-1 py-0.5 rounded border ml-1 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-600'}`}>↓</kbd> navigate
+              <kbd className="px-1 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]">↑</kbd>
+              <kbd className="px-1 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)] ml-1">↓</kbd> navigate
             </span>
             <span>
-              <kbd className={`px-1 py-0.5 rounded border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-600'}`}>↵</kbd> jump to chat
+              <kbd className="px-1 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]">↵</kbd> jump to chat
             </span>
             <span>
-              <kbd className={`px-1 py-0.5 rounded border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-300 text-slate-600'}`}>esc</kbd> close
+              <kbd className="px-1 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]">esc</kbd> close
             </span>
           </div>
-          <span className="hidden sm:inline text-[10px] text-slate-400 font-sans">
-            Powered by Cyber Sahayak Universal Search
+          <span className="hidden sm:inline text-xs text-[var(--text-muted)] font-sans">
+            Universal Search
           </span>
         </div>
       </div>

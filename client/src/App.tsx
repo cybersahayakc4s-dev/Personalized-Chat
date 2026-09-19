@@ -15,10 +15,13 @@ import { ScheduleUpdateModal } from './components/modals/ScheduleUpdateModal';
 import { CommandPalette } from './components/modals/CommandPalette';
 import { ToastContainer, ToastMessage } from './components/common/Toast';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ActivityDrawer } from './components/chat/ActivityDrawer';
+import { SettingsModal } from './components/modals/SettingsModal';
 
 function ChatApp() {
   const {
     theme,
+    themePreset,
     commandPaletteOpen,
     setCommandPaletteOpen,
     toasts,
@@ -27,32 +30,40 @@ function ChatApp() {
     scheduleUpdateModalOpen,
     setScheduleUpdateModalOpen,
     isAuthenticated
-  } = useChat();
+  } = useChat() as any;
 
-  // Sync theme attribute, meta theme-color, and dark class on documentElement and body
+  const isDark = theme !== 'light';
+
+  // Sync theme attribute, meta theme-color, data-preset, and dark class on documentElement and body
   React.useEffect(() => {
-    const isDark = theme !== 'nordic';
-    const themeColor = isDark ? '#121620' : '#D8DFE7';
+    const activePreset = themePreset || (isDark ? 'dark_cyber_indigo' : 'oceanic_corporate');
+
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.body.classList.add('dark');
+      document.body.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.body.classList.remove('dark');
+      document.body.setAttribute('data-theme', 'light');
+    }
+
+    document.documentElement.setAttribute('data-preset', activePreset);
+    document.body.setAttribute('data-preset', activePreset);
+
+    const canvasColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-canvas').trim();
     let metaTheme = document.querySelector('meta[name="theme-color"]');
     if (!metaTheme) {
       metaTheme = document.createElement('meta');
       metaTheme.setAttribute('name', 'theme-color');
       document.head.appendChild(metaTheme);
     }
-    metaTheme.setAttribute('content', themeColor);
-
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', theme || 'slate');
-      document.body.classList.add('dark');
-      document.body.setAttribute('data-theme', theme || 'slate');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.setAttribute('data-theme', 'nordic');
-      document.body.classList.remove('dark');
-      document.body.setAttribute('data-theme', 'nordic');
+    if (canvasColor) {
+      metaTheme.setAttribute('content', canvasColor);
     }
-  }, [theme]);
+  }, [theme, themePreset, isDark]);
 
   // Global Cmd+K / Ctrl+K listener for Command Palette (Universal Search)
   React.useEffect(() => {
@@ -124,8 +135,9 @@ function ChatApp() {
   if (!isAuthenticated) {
     return (
       <div
-        data-theme={theme}
-        className="flex h-screen w-screen bg-[var(--surface-base)] text-[var(--text-primary)] font-sans overflow-hidden items-center justify-center p-4 selection:bg-emerald-600 selection:text-white"
+        data-theme={isDark ? 'dark' : 'light'}
+        data-preset={themePreset || (isDark ? 'dark_cyber_indigo' : 'oceanic_corporate')}
+        className="flex h-screen w-screen bg-canvas text-primary font-sans overflow-hidden items-center justify-center p-4 selection:bg-accent selection:text-white"
       >
         <LoginModal isStandalone={true} />
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
@@ -135,14 +147,15 @@ function ChatApp() {
 
   return (
     <div
-      data-theme={theme}
-      className="flex h-screen w-screen bg-[var(--surface-base)] text-[var(--text-primary)] font-sans overflow-hidden selection:bg-emerald-600 selection:text-white"
+      data-theme={isDark ? 'dark' : 'light'}
+      data-preset={themePreset || (isDark ? 'dark_cyber_indigo' : 'oceanic_corporate')}
+      className="flex h-screen w-screen bg-canvas text-primary font-sans overflow-hidden selection:bg-accent selection:text-white"
     >
       {/* Navigation Sidebar */}
       <Sidebar />
 
       {/* Main Chat Workspace */}
-      <main className="flex-1 flex overflow-hidden min-w-0 bg-[var(--surface-base)]">
+      <main className="flex-1 flex overflow-hidden min-w-0 bg-canvas">
         <ChatArea />
         <ThreadDrawer />
         <RightSidebar />
@@ -169,6 +182,12 @@ function ChatApp() {
         toasts={toasts}
         onDismiss={dismissToast}
       />
+
+      {/* Activity & Mentions Drawer */}
+      <ActivityDrawer />
+
+      {/* Workspace Preferences & Settings Modal */}
+      <SettingsModal />
     </div>
   );
 }

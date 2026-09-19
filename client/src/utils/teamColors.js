@@ -1,23 +1,19 @@
 /**
- * Team Identity Colors according to design-brief.md §2:
- * team_legal: #7C2D3A
- * team_ai: #0F6B65
- * hr_admin: #3B5170
- * seo: #B08900
- * coordination: #35603F
+ * Team Identity per NEW-DESIGN.md:
+ * Restrained grayscale-first system with single Navy functional accent.
+ * No hardcoded hex codes.
  */
 
 export const TEAM_COLORS = {
-  team_legal: '#7C2D3A',
-  team_ai: '#0F6B65',
-  hr_admin: '#3B5170',
-  seo: '#B08900',
-  coordination: '#35603F',
+  team_legal: 'var(--text-secondary)',
+  team_ai: 'var(--text-secondary)',
+  hr_admin: 'var(--text-secondary)',
+  seo: 'var(--text-secondary)',
+  coordination: 'var(--text-secondary)',
 };
 
-export function getTeamColor(teamKey) {
-  if (!teamKey) return 'var(--accent)';
-  return TEAM_COLORS[teamKey] || 'var(--accent)';
+export function getTeamColor(_teamKey) {
+  return 'var(--text-secondary)';
 }
 
 export const TEAM_DISPLAY_NAMES = {

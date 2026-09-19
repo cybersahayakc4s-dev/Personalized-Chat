@@ -6,6 +6,7 @@ from pydantic import field_validator, model_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Personalize Chat"
+    VERSION: str = "3.1.0"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     API_V1_STR: str = "/api"

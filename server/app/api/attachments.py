@@ -256,6 +256,7 @@ def view_attachment(
         media_type=att.mime_type,
         headers={
             "Content-Security-Policy": "sandbox",
-            "X-Content-Type-Options": "nosniff"
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'inline; filename="{att.file_name}"'
         }
     )

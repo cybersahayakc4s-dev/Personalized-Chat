@@ -23,7 +23,7 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
     theme
   } = useChat() as any;
 
-  const isDark = theme !== 'nordic';
+  const isDark = theme !== 'light';
 
   // Load persisted settings
   const [scheduledTime, setScheduledTime] = useState(() => {
@@ -141,26 +141,22 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-lg p-6 rounded-2xl shadow-2xl border cursor-default animate-in zoom-in-95 duration-200 ${
-          isDark
-            ? 'bg-[#0f172a] border-slate-800 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
-            : 'bg-white border-slate-200 text-slate-900 shadow-xl'
-        }`}
+        className="w-full max-w-lg p-6 rounded-2xl shadow-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] cursor-default animate-in zoom-in-95 duration-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80 mb-5">
+        <div className="flex items-center justify-between pb-3.5 border-b border-subtle mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xs">
-              <Clock className="w-5 h-5 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-accent-muted border border-accent text-accent flex items-center justify-center shadow-xs">
+              <Clock className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-heading font-bold text-base">Schedule Daily Updates</h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                <h3 className="font-heading font-bold text-base text-primary">Schedule Daily Updates</h3>
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-surface-hover text-secondary border border-subtle">
                   #updates
                 </span>
               </div>
-              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <p className="text-xs mt-0.5 text-secondary">
                 Configure daily alarm reminder and broadcast update requests to all teams.
               </p>
             </div>
@@ -168,7 +164,7 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-surface-hover transition cursor-pointer"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -176,16 +172,14 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
         </div>
 
         {/* Alarm Clock Card */}
-        <div className={`p-4 rounded-xl border mb-5 ${
-          isDark ? 'bg-[#151f32] border-slate-800/90' : 'bg-slate-50 border-slate-200'
-        }`}>
+        <div className="p-4 rounded-xl border border-subtle bg-surface-hover mb-5">
           <div className="flex items-center justify-between gap-4 mb-3">
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-semibold flex items-center gap-1.5">
+              <span className="text-xs font-mono uppercase tracking-wider text-secondary font-semibold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 Target Schedule Time
               </span>
-              <div className="text-2xl font-bold font-mono text-white mt-1 tracking-tight">
+              <div className="text-2xl font-bold font-mono text-primary mt-1 tracking-tight">
                 {formatTimeDisplay(scheduledTime)}
               </div>
             </div>
@@ -195,18 +189,14 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
                 type="time"
                 value={scheduledTime}
                 onChange={(e) => setScheduledTime(e.target.value)}
-                className={`px-3 py-1.5 rounded-lg font-mono text-sm font-semibold border focus:outline-hidden ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-amber-300 focus:border-amber-400'
-                    : 'bg-white border-slate-300 text-slate-800 focus:border-blue-500'
-                }`}
+                className="px-3 py-1.5 rounded-lg font-mono text-sm font-bold bg-canvas border border-subtle text-primary focus:border-focus"
               />
             </div>
           </div>
 
-          {/* Quick Presets */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60">
-            <span className="text-[10px] font-mono text-slate-400 mr-1">Presets:</span>
+          {/* Preset Buttons */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-subtle">
+            <span className="text-xs text-muted font-mono mr-1">Quick Presets:</span>
             {PRESET_TIMES.map((p) => (
               <button
                 key={p.value}
@@ -214,10 +204,8 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
                 onClick={() => setScheduledTime(p.value)}
                 className={`px-2.5 py-1 rounded-md text-xs font-mono font-medium transition cursor-pointer ${
                   scheduledTime === p.value
-                    ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                    : isDark
-                    ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
-                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    ? 'bg-accent text-white font-bold shadow-xs'
+                    : 'bg-canvas text-secondary hover:bg-surface hover:text-primary border border-subtle'
                 }`}
               >
                 {p.label}
@@ -227,14 +215,12 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
         </div>
 
         {/* Reminder Enable Switch */}
-        <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 mb-4 ${
-          isDark ? 'bg-[#151f32]/60 border-slate-800/70' : 'bg-slate-50 border-slate-200'
-        }`}>
+        <div className="p-3.5 rounded-xl border border-subtle bg-surface-hover flex items-center justify-between gap-3 mb-4">
           <div>
-            <span className="text-xs font-semibold block text-slate-200">
+            <span className="text-xs font-semibold block text-primary">
               Automated Daily Reminder Active
             </span>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs text-secondary mt-0.5">
               Notifies all workspace members at {formatTimeDisplay(scheduledTime)} every day.
             </p>
           </div>
@@ -245,13 +231,13 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
               onChange={(e) => setIsEnabled(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+            <div className="w-11 h-6 bg-surface-hover peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-subtle after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
           </label>
         </div>
 
         {/* Message Prompt */}
         <div className="mb-5">
-          <label className={`block mb-1.5 text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+          <label className="block mb-1.5 text-xs font-semibold text-primary">
             Notification Prompt Message
           </label>
           <textarea
@@ -259,21 +245,17 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
             onChange={(e) => setCustomPrompt(e.target.value)}
             rows={3}
             placeholder="Write reminder instructions for all teams..."
-            className={`w-full p-2.5 rounded-lg border text-xs leading-relaxed focus:outline-hidden resize-none ${
-              isDark
-                ? 'bg-slate-900 border-slate-700 text-slate-100 focus:border-amber-400'
-                : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500'
-            }`}
+            className="w-full p-2.5 rounded-lg border border-subtle bg-canvas text-primary placeholder:text-muted text-xs leading-relaxed focus:border-focus resize-none"
           />
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-subtle">
           <button
             type="button"
             onClick={handleBroadcastNow}
             disabled={isBroadcasting}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer hover:brightness-105"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-surface-hover hover:bg-surface text-primary border border-subtle font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
             title="Dispatch immediate reminder to all workspace users"
           >
             <Megaphone className="w-3.5 h-3.5" />
@@ -284,14 +266,14 @@ export const ScheduleUpdateModal: React.FC<ScheduleUpdateModalProps> = ({ isOpen
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white transition cursor-pointer"
+              className="px-3 py-2 rounded-lg text-xs text-secondary hover:text-primary hover:bg-surface-hover transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSaveSchedule}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               {justSaved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
               <span>{justSaved ? 'Saved!' : 'Save Schedule'}</span>

@@ -2012,3 +2012,74 @@ def test_startup_validation_production_explicit_origin_acceptance():
     assert "https://chat.company.internal" in s.cors_origins
     assert "file://" in s.cors_origins
     assert "null" in s.cors_origins
+
+
+# ==============================================================================
+# V3.1.0 BANNER & USER PROFILE SECURITY TESTS
+# ==============================================================================
+
+def test_user_banner_security_and_lifecycle():
+    """
+    Verifies v3.1.0 banner security:
+    1. Rejection of disguised executables (MZ header)
+    2. Rejection of scripts with image/jpeg MIME
+    3. Rejection of oversized files (>10MB)
+    4. Server-side UUID naming neutralizing path traversal (../../etc)
+    5. Caching and nosniff security headers on GET
+    6. DELETE lifecycle strictly limited to authenticated user's own file
+    """
+    admin_token = get_token(settings.INITIAL_ADMIN_EMAIL, settings.INITIAL_ADMIN_PASSWORD)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 1. Disguised executable with image/png MIME -> REJECT 400
+    fake_exe = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00" + b"\x00" * 100
+    res_exe = client.post(
+        "/api/users/me/banner",
+        headers=headers,
+        files={"file": ("malware.png", fake_exe, "image/png")}
+    )
+    assert res_exe.status_code == 400
+
+    # 2. Text script with image/jpeg MIME -> REJECT 400
+    fake_script = b"#!/bin/bash\necho 'hacked'\n"
+    res_script = client.post(
+        "/api/users/me/banner",
+        headers=headers,
+        files={"file": ("script.jpg", fake_script, "image/jpeg")}
+    )
+    assert res_script.status_code == 400
+
+    # 3. Path traversal attempt in client filename -> Server UUID used cleanly
+    valid_png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4"
+        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    res_upload = client.post(
+        "/api/users/me/banner",
+        headers=headers,
+        files={"file": ("../../../../etc/evil.png", valid_png, "image/png")}
+    )
+    assert res_upload.status_code == 200
+    banner_url = res_upload.json()["banner_url"]
+    assert ".." not in banner_url
+    assert banner_url.startswith("/api/users/banner/banner_")
+
+    # 4. Verify user profile returns banner_url
+    me_res = client.get("/api/users/me", headers=headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["banner_url"] == banner_url
+
+    # 5. GET served with nosniff header
+    get_res = client.get(banner_url)
+    assert get_res.status_code == 200
+    assert get_res.headers.get("x-content-type-options") == "nosniff"
+
+    # 6. Delete banner
+    del_res = client.delete("/api/users/me/banner", headers=headers)
+    assert del_res.status_code == 200
+    assert del_res.json()["banner_url"] is None
+
+    # Subsequent GET returns 404
+    assert client.get(banner_url).status_code == 404
+

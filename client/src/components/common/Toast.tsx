@@ -29,21 +29,21 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
         return (
           <div
             key={t.id}
-            className={`pointer-events-auto p-4 rounded-xl shadow-2xl border backdrop-blur-md flex items-start gap-3 transition-all animate-in slide-in-from-top-3 duration-200 ${
+            className={`pointer-events-auto p-4 rounded-xl shadow-lg border flex items-start gap-3 transition-all animate-in slide-in-from-top-3 duration-200 bg-surface text-primary border-subtle ${
               isError
-                ? 'bg-rose-50/95 dark:bg-rose-950/90 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-100 border-l-4 border-l-rose-500'
+                ? 'border-l-4 border-l-danger'
                 : isSuccess
-                ? 'bg-emerald-50/95 dark:bg-emerald-950/90 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100 border-l-4 border-l-emerald-500'
-                : 'bg-[var(--surface-card)] border-[var(--border-medium)] text-[var(--text-primary)] border-l-4 border-l-blue-500 shadow-blue-500/10'
+                ? 'border-l-4 border-l-accent'
+                : 'border-l-4 border-l-accent'
             }`}
           >
             <div className="flex-shrink-0 mt-0.5">
               {isError ? (
-                <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <AlertCircle className="w-5 h-5 text-danger" />
               ) : isSuccess ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 className="w-5 h-5 text-accent" />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center">
+                <div className="w-5 h-5 rounded-full bg-accent-muted text-accent flex items-center justify-center">
                   <Info className="w-3.5 h-3.5" />
                 </div>
               )}
