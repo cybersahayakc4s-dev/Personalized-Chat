@@ -52,63 +52,65 @@ jobs:
             HAS_DESKTOP_FILES="false"
           fi
 
-          # 4. Strictly evaluate semver increase vs unbumped desktop changes
-          EVAL_RESULT=$(CURRENT_VERSION="$CURRENT_VERSION" PREV_VERSION="$PREV_VERSION" HAS_DESKTOP_FILES="$HAS_DESKTOP_FILES" python3 - << 'EOF'
-import os, re, sys
+          # 4. Strictly evaluate semver increase vs unbumped desktop changes via Python
+          export CURRENT_VERSION PREV_VERSION HAS_DESKTOP_FILES
+          export PY_CODE='
+          import os, re, sys
 
-curr = os.environ.get("CURRENT_VERSION", "").strip()
-prev = os.environ.get("PREV_VERSION", "").strip()
-has_desktop_files = os.environ.get("HAS_DESKTOP_FILES", "false") == "true"
+          curr = os.environ.get("CURRENT_VERSION", "").strip()
+          prev = os.environ.get("PREV_VERSION", "").strip()
+          has_desktop_files = os.environ.get("HAS_DESKTOP_FILES", "false") == "true"
 
-def parse_semver(v):
-    if not v:
-        return None
-    m = re.match(r'^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$', v.strip())
-    if not m:
-        return None
-    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4))
+          def parse_semver(v):
+              if not v:
+                  return None
+              m = re.match(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$", v.strip())
+              if not m:
+                  return None
+              return (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4))
 
-def is_greater(v1, v2):
-    s1 = parse_semver(v1)
-    s2 = parse_semver(v2)
-    if not s1 or not s2:
-        return False
-    if (s1[0], s1[1], s1[2]) > (s2[0], s2[1], s2[2]):
-        return True
-    if (s1[0], s1[1], s1[2]) < (s2[0], s2[1], s2[2]):
-        return False
-    if not s1[3] and s2[3]:
-        return True
-    if s1[3] and not s2[3]:
-        return False
-    if s1[3] and s2[3]:
-        return s1[3] > s2[3]
-    return False
+          def is_greater(v1, v2):
+              s1 = parse_semver(v1)
+              s2 = parse_semver(v2)
+              if not s1 or not s2:
+                  return False
+              if (s1[0], s1[1], s1[2]) > (s2[0], s2[1], s2[2]):
+                  return True
+              if (s1[0], s1[1], s1[2]) < (s2[0], s2[1], s2[2]):
+                  return False
+              if not s1[3] and s2[3]:
+                  return True
+              if s1[3] and not s2[3]:
+                  return False
+              if s1[3] and s2[3]:
+                  return s1[3] > s2[3]
+              return False
 
-# Validate current version semver format
-s_curr = parse_semver(curr)
-if not s_curr:
-    print("ERROR_INVALID_SEMVER")
-    sys.exit(0)
+          # Validate current version semver format
+          s_curr = parse_semver(curr)
+          if not s_curr:
+              print("ERROR_INVALID_SEMVER")
+              sys.exit(0)
 
-# Check if version was changed
-if curr != prev:
-    if prev:
-        s_prev = parse_semver(prev)
-        if not s_prev or not is_greater(curr, prev):
-            print("ERROR_NOT_GREATER")
-            sys.exit(0)
-    print("RELEASE")
-    sys.exit(0)
+          # Check if version was changed
+          if curr != prev:
+              if prev:
+                  s_prev = parse_semver(prev)
+                  if not s_prev or not is_greater(curr, prev):
+                      print("ERROR_NOT_GREATER")
+                      sys.exit(0)
+              print("RELEASE")
+              sys.exit(0)
 
-# Version did NOT change
-if has_desktop_files:
-    print("ERROR_UNBUMPED_DESKTOP_CHANGES")
-    sys.exit(0)
+          # Version did NOT change
+          if has_desktop_files:
+              print("ERROR_UNBUMPED_DESKTOP_CHANGES")
+              sys.exit(0)
 
-print("SKIP")
-EOF
-)
+          print("SKIP")
+          '
+
+          EVAL_RESULT=$(python3 -c "import os, textwrap; exec(compile(textwrap.dedent(os.environ['PY_CODE']), '<evaluator>', 'exec'))")
 
           case "$EVAL_RESULT" in
             "RELEASE")
