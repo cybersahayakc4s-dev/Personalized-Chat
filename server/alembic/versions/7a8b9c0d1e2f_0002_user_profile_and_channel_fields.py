@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -19,19 +20,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema with additive-only columns."""
-    op.add_column(
-        'workspace_settings',
-        sa.Column('allow_custom_channels', sa.Boolean(), server_default=sa.text('false'), nullable=False)
-    )
-    op.add_column(
-        'users',
-        sa.Column('banner_url', sa.String(length=512), nullable=True)
-    )
-    op.add_column(
-        'users',
-        sa.Column('avatar_url', sa.String(length=512), nullable=True)
-    )
+    """Upgrade schema with idempotent additive-only columns."""
+    conn = op.get_bind()
+    is_sqlite = conn.dialect.name == 'sqlite'
+
+    if is_sqlite:
+        inspector = inspect(conn)
+        ws_cols = [c['name'] for c in inspector.get_columns('workspace_settings')]
+        if 'allow_custom_channels' not in ws_cols:
+            conn.execute(sa.text('ALTER TABLE workspace_settings ADD COLUMN allow_custom_channels BOOLEAN DEFAULT 0 NOT NULL;'))
+        u_cols = [c['name'] for c in inspector.get_columns('users')]
+        if 'banner_url' not in u_cols:
+            conn.execute(sa.text('ALTER TABLE users ADD COLUMN banner_url VARCHAR(512);'))
+        if 'avatar_url' not in u_cols:
+            conn.execute(sa.text('ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512);'))
+    else:
+        conn.execute(sa.text('ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS allow_custom_channels BOOLEAN DEFAULT false NOT NULL;'))
+        conn.execute(sa.text('ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url VARCHAR(512);'))
+        conn.execute(sa.text('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512);'))
 
 
 def downgrade() -> None:
