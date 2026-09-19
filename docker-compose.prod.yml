@@ -94,6 +94,8 @@ services:
         limits:
           cpus: '0.5'
           memory: 256M
+    volumes:
+      - /opt/company/apps/personalize-chat/download/desktop:/usr/share/nginx/download/desktop:ro
     logging:
       driver: "json-file"
       options:
