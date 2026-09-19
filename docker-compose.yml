@@ -96,6 +96,8 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+    volumes:
+      - /opt/company/apps/personalize-chat/download/desktop:/usr/share/nginx/download/desktop:ro
     networks:
       - personalize_chat_network
 
