@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Auto-updater desktop methods
-  getAppVersion: () => ipcRenderer.invoke('updater:get-state').then(s => s?.version || '3.1.0'),
+  getAppVersion: () => ipcRenderer.invoke('updater:get-state').then(s => s?.version || '3.1.1'),
   getUpdaterState: () => ipcRenderer.invoke('updater:get-state'),
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   installUpdate: () => ipcRenderer.invoke('updater:install'),

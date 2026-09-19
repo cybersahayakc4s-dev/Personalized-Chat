@@ -432,7 +432,7 @@ export const Sidebar: React.FC = () => {
                 <ShieldCheck className="h-3.5 w-3.5 text-secondary shrink-0" />
               </div>
               <div className="text-xs text-muted flex items-center gap-1 mt-0.5">
-                <span>C4S-Connector • v3.1.0</span>
+                <span>C4S-Connector • v3.1.1</span>
               </div>
             </div>
 

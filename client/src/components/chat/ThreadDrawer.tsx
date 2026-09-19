@@ -59,6 +59,7 @@ export const ThreadDrawer: React.FC = () => {
             Original Post
           </div>
           <MessageItem
+            className="mt-0"
             message={parentMessage}
             sender={parentSender}
             isOwnMessage={parentMessage.senderId === currentUser.id}
@@ -83,6 +84,7 @@ export const ThreadDrawer: React.FC = () => {
             return (
               <MessageItem
                 key={reply.id}
+                className="mt-1"
                 message={reply}
                 sender={sender}
                 isOwnMessage={reply.senderId === currentUser.id}

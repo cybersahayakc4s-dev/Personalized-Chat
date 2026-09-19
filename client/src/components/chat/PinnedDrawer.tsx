@@ -56,6 +56,7 @@ export const PinnedDrawer: React.FC = () => {
             return (
               <div key={msg.id} className="p-1 rounded-lg border bg-[var(--bg-surface)] border-[var(--border-subtle)]">
                 <MessageItem
+                  className="mt-0.5"
                   message={msg}
                   sender={sender}
                   isOwnMessage={msg.senderId === currentUser?.id}

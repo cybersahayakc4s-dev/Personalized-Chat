@@ -36,6 +36,7 @@ export interface MessageItemProps {
   showThreadButton?: boolean;
   isHighlighted?: boolean;
   isGrouped?: boolean;
+  className?: string;
 }
 
 const COMMON_EMOJIS = ['👍', '❤️', '🔥', '🚀', '🔒', '💡', '👀', '🎉'];
@@ -83,7 +84,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onOpenThread,
   showThreadButton = true,
   isHighlighted = false,
-  isGrouped = false
+  isGrouped = false,
+  className
 }) => {
   const {
     currentUser,
@@ -98,7 +100,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     dismissFailedMessage,
     setProfileModalUser,
     messages,
-    setReplyingToMessage
+    setReplyingToMessage,
+    setHighlightedMessageId
   } = useChat() as any;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -189,9 +192,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     <>
       <div
         id={`msg-${message.id}`}
-        className={`group relative flex w-full px-3 py-0.5 transition-colors ${
-          isHighlighted ? 'bg-surface-hover' : ''
-        } ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+        className={`group relative flex w-full px-3 transition-colors ${
+          className !== undefined ? className : (isGrouped ? 'mt-1' : 'mt-3.5')
+        } ${isHighlighted ? 'bg-surface-hover' : ''} ${
+          isOwnMessage ? 'justify-end' : 'justify-start'
+        }`}
       >
         {/* Hover Action Bar — cleanly anchored to message bubble */}
         {!isDeleted && (
@@ -406,19 +411,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               </div>
             )}
 
-            {/* Quoted reply snippet */}
-            {repliedMessage && !isDeleted && (
-              <div
-                className="flex items-center gap-1.5 text-xs mb-1 px-2 py-1 rounded-lg opacity-70"
-                style={{ background: bubbleBg, borderLeft: `3px solid ${bubbleBorder}` }}
-              >
-                <Reply className="h-3 w-3 shrink-0" style={{ color: bubbleText }} />
-                <span className="font-medium truncate" style={{ color: bubbleText }}>
-                  {repliedMessage.sender?.name || 'Colleague'}: {repliedMessage.content || '[Attachment]'}
-                </span>
-              </div>
-            )}
-
             {/* Bubble body — mature modern workspace card style */}
             <div
               className="rounded-xl px-3.5 py-2 min-w-0 shadow-2xs transition-shadow"
@@ -430,6 +422,30 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 borderBottomLeftRadius: isOwnMessage ? '12px' : '3px',
               }}
             >
+              {/* Quoted reply snippet — nested inside bubble */}
+              {repliedMessage && !isDeleted && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHighlightedMessageId?.(repliedMessage.id);
+                  }}
+                  className="flex items-center gap-1.5 text-xs mb-1.5 px-2.5 py-1 rounded-md max-w-full text-left cursor-pointer transition-opacity hover:opacity-90 w-full"
+                  style={{
+                    background: isOwnMessage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                    borderLeft: `3px solid ${isOwnMessage ? 'var(--accent, #38bdf8)' : 'var(--border, #64748b)'}`,
+                  }}
+                  title="Click to jump to original message"
+                >
+                  <Reply className="h-3 w-3 shrink-0 opacity-70" />
+                  <span className="font-semibold text-[11px] shrink-0 opacity-90">
+                    {repliedMessage.sender?.name || 'Colleague'}:
+                  </span>
+                  <span className="truncate text-[11px] opacity-80">
+                    {repliedMessage.content || '[Attachment]'}
+                  </span>
+                </button>
+              )}
               {isDeleted ? (
                 <p className="text-xs italic opacity-60">
                   {message.content === 'Message deleted by Admin'
@@ -571,73 +587,75 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   })()}
                 </div>
               )}
-            </div>
 
-            {/* Footer row: time + status */}
-            <div className={`flex items-center gap-1.5 mt-0.5 px-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-              <span className="text-xs text-muted font-mono">{timeStr}</span>
+              {/* Footer row: time + status — cleanly docked inside bottom of bubble */}
+              {!isDeleted && (
+                <div className={`flex items-center gap-1.5 mt-1 pt-0.5 select-none ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                  <span className="text-[10.5px] font-mono opacity-70 leading-none">{timeStr}</span>
 
-              {message.status === 'failed' && (
-                <span className="flex items-center gap-1 text-xs text-danger">
-                  <AlertCircle className="h-3 w-3" />
-                  Failed
-                  <button
-                    type="button"
-                    onClick={() => retrySendMessage(message.id)}
-                    className="underline cursor-pointer ml-0.5"
-                  >
-                    Retry
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => dismissFailedMessage(message.id)}
-                    className="text-muted hover:text-secondary cursor-pointer ml-0.5"
-                  >
-                    Dismiss
-                  </button>
-                </span>
-              )}
-
-              {message.status === 'sending' && (
-                <span className="h-2.5 w-2.5 rounded-full border border-slate-400 border-t-transparent animate-spin inline-block" title="Sending..." />
-              )}
-
-              {isOwnMessage && isDm && message.status !== 'sending' && message.status !== 'failed' && (
-                message.readAt ? (
-                  <span
-                    tabIndex={0}
-                    className="seen-pill"
-                    title={`Seen at ${new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-                  >
-                    <span className="font-semibold tracking-tighter text-sky-400">✓✓</span>
-                    <span className="seen-label">Seen</span>
-                    <span className="seen-time">
-                      {new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {message.status === 'failed' && (
+                    <span className="flex items-center gap-1 text-[11px] text-danger">
+                      <AlertCircle className="h-3 w-3" />
+                      Failed
+                      <button
+                        type="button"
+                        onClick={() => retrySendMessage(message.id)}
+                        className="underline cursor-pointer ml-0.5"
+                      >
+                        Retry
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dismissFailedMessage(message.id)}
+                        className="opacity-70 hover:opacity-100 cursor-pointer ml-0.5"
+                      >
+                        Dismiss
+                      </button>
                     </span>
-                  </span>
-                ) : isPeerOnline ? (
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-zinc-400 px-1 py-0.5 rounded cursor-default select-none"
-                    title="Delivered (not opened yet)"
-                  >
-                    <span className="font-semibold tracking-tighter text-slate-400 dark:text-zinc-400">✓✓</span>
-                    <span>Delivered</span>
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-zinc-400 px-1 py-0.5 rounded cursor-default select-none"
-                    title="Sent (waiting for recipient)"
-                  >
-                    <span className="font-semibold text-slate-400 dark:text-zinc-400">✓</span>
-                    <span>Sent</span>
-                  </span>
-                )
-              )}
+                  )}
 
-              {isOwnMessage && !isDm && message.status === 'sent' && (
-                <span className="text-slate-400 dark:text-zinc-400 text-xs font-semibold select-none px-0.5" title="Sent to channel">
-                  ✓
-                </span>
+                  {message.status === 'sending' && (
+                    <span className="h-2 w-2 rounded-full border border-current border-t-transparent animate-spin inline-block opacity-70" title="Sending..." />
+                  )}
+
+                  {isOwnMessage && isDm && message.status !== 'sending' && message.status !== 'failed' && (
+                    message.readAt ? (
+                      <span
+                        tabIndex={0}
+                        className="seen-pill"
+                        title={`Seen at ${new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                      >
+                        <span className="font-semibold tracking-tighter text-sky-400">✓✓</span>
+                        <span className="seen-label">Seen</span>
+                        <span className="seen-time">
+                          {new Date(message.readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </span>
+                    ) : isPeerOnline ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-[11px] font-medium opacity-75 px-1 py-0.2 rounded cursor-default select-none"
+                        title="Delivered (not opened yet)"
+                      >
+                        <span className="font-semibold tracking-tighter">✓✓</span>
+                        <span>Delivered</span>
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 text-[11px] font-medium opacity-75 px-1 py-0.2 rounded cursor-default select-none"
+                        title="Sent (waiting for recipient)"
+                      >
+                        <span className="font-semibold">✓</span>
+                        <span>Sent</span>
+                      </span>
+                    )
+                  )}
+
+                  {isOwnMessage && !isDm && message.status === 'sent' && (
+                    <span className="text-[11px] font-semibold select-none px-0.5 opacity-75" title="Sent to channel">
+                      ✓
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

@@ -55,7 +55,7 @@ function createHandlers(mainWindow, fakeAppPath, mockUpdaterState, mockAutoUpdat
       if (!isTrustedRendererSender(event, mainWindow, fakeAppPath)) {
         return { ok: false, error: 'Unauthorized IPC caller' };
       }
-      return { ok: true, updateInfo: { version: '3.1.0' } };
+      return { ok: true, updateInfo: { version: '3.1.1' } };
     },
 
     'updater:install': async (event) => {
@@ -70,7 +70,7 @@ function createHandlers(mainWindow, fakeAppPath, mockUpdaterState, mockAutoUpdat
       if (!isTrustedRendererSender(event, mainWindow, fakeAppPath)) {
         return null;
       }
-      return { ...mockUpdaterState, version: '3.1.0' };
+      return { ...mockUpdaterState, version: '3.1.1' };
     }
   };
 }
@@ -144,7 +144,7 @@ async function runTests() {
   };
   const checkRes = await handlers['updater:check'](legitimateEvent);
   assert.strictEqual(checkRes.ok, true);
-  assert.strictEqual(checkRes.updateInfo.version, '3.1.0');
+  assert.strictEqual(checkRes.updateInfo.version, '3.1.1');
 
   const installRes = await handlers['updater:install'](legitimateEvent);
   assert.strictEqual(installRes, true);
@@ -152,7 +152,7 @@ async function runTests() {
 
   const stateRes = await handlers['updater:get-state'](legitimateEvent);
   assert.strictEqual(stateRes.status, 'available');
-  assert.strictEqual(stateRes.version, '3.1.0');
+  assert.strictEqual(stateRes.version, '3.1.1');
   console.log('  -> PASS: Allowed legitimate top-level mainWindow caller across all 3 handlers.\n');
 
   console.log('====================================================');

@@ -550,7 +550,7 @@ export const ChatArea: React.FC = () => {
               onScroll={handleScroll}
               className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4 bg-transparent custom-scrollbar"
             >
-              <div ref={messagesContentRef} className="space-y-4 pb-6">
+              <div ref={messagesContentRef} className="flex flex-col pb-6">
                 {/* Empty State when no messages */}
                 {currentMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center p-8 my-10">

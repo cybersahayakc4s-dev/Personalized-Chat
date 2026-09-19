@@ -42,7 +42,7 @@ export const SettingsModal: React.FC = () => {
   const [minimizedCountdown, setMinimizedCountdown] = useState<number | null>(null);
 
   // Desktop Updater state
-  const [appVersion, setAppVersion] = useState<string>('3.1.0');
+  const [appVersion, setAppVersion] = useState<string>('3.1.1');
   const [updaterState, setUpdaterState] = useState<UpdaterState | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
 

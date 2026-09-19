@@ -77,3 +77,6 @@ Thumbs.db
 .vscode/
 .idea/
 .playwright-mcp/
+
+# Knowledge Graph outputs
+graphify-out/

@@ -210,20 +210,20 @@ export const RightSidebar: React.FC = () => {
                   <div
                     key={msg.id}
                     onClick={handleJumpToMessage}
-                    className="p-2.5 rounded-lg border text-xs transition bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-accent/40 hover:bg-surface-hover/50 cursor-pointer group"
+                    className="p-2.5 rounded-lg border text-xs transition bg-surface-hover/70 border-subtle hover:border-accent/40 hover:bg-surface-hover cursor-pointer group"
                     title="Click to jump to message"
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold truncate text-[var(--text-primary)] group-hover:text-accent transition-colors">
+                      <span className="font-semibold truncate text-primary group-hover:text-accent transition-colors">
                         {sender.name}
                       </span>
-                      <span className="text-xs font-mono text-[var(--text-muted)]">
+                      <span className="text-xs font-mono text-muted">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
 
                     {msg.content ? (
-                      <p className="line-clamp-3 text-xs leading-relaxed text-[var(--text-secondary)] mb-1">
+                      <p className="line-clamp-3 text-xs leading-relaxed text-secondary mb-1">
                         {msg.content}
                       </p>
                     ) : null}
@@ -271,7 +271,7 @@ export const RightSidebar: React.FC = () => {
         {!isDm && (
           <div className="p-3.5 flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
                 <Users className="w-3.5 h-3.5 text-[var(--brand-primary)]" />
                 <span>Members of the Chat</span>
               </div>
@@ -365,15 +365,15 @@ export const RightSidebar: React.FC = () => {
               sharedFiles.map((file, idx) => (
                 <div
                   key={`${file.id}-${idx}`}
-                  className="flex items-center justify-between p-2 rounded-lg border transition bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
+                  className="flex items-center justify-between p-2 rounded-lg border transition bg-surface-hover/70 border-subtle hover:border-accent/40 hover:bg-surface-hover"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     {getFileIcon(file?.name || '', file?.type || '')}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate text-[var(--text-primary)]" title={file?.name || 'Attachment'}>
+                      <p className="text-xs font-medium truncate text-primary" title={file?.name || 'Attachment'}>
                         {file?.name || 'Attachment'}
                       </p>
-                      <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-mono mt-0.5">
+                      <div className="flex items-center gap-1.5 text-xs text-muted font-mono mt-0.5">
                         <span>{(file.size / 1024).toFixed(1)} KB</span>
                         <span>•</span>
                         <span className="truncate">{file.senderName}</span>
@@ -384,7 +384,7 @@ export const RightSidebar: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => downloadAttachmentFile(file.downloadUrl || file.url, file.name)}
-                    className="p-1.5 rounded-md transition-colors ml-2 shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
+                    className="p-1.5 rounded-md transition-colors ml-2 shrink-0 text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer"
                     title={`Download ${file.name}`}
                   >
                     <Download className="w-3.5 h-3.5" />
