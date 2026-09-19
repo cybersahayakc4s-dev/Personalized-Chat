@@ -167,8 +167,8 @@ jobs:
               ;;
           esac
 
-  build-and-publish:
-    name: Build & Publish Windows Installer
+  build-windows:
+    name: Build Windows Installer (x64)
     needs: check-changes
     if: needs.check-changes.outputs.should_release == 'true'
     runs-on: windows-latest
@@ -227,6 +227,39 @@ jobs:
           echo "All release artifacts verified successfully:"
           ls -la "$EXE_FILE" "$YAML_FILE" "$BLOCKMAP_FILE"
 
+      - name: Upload release artifacts for publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-v${{ needs.check-changes.outputs.app_version }}
+          path: |
+            dist-electron/Personalize Chat Setup ${{ needs.check-changes.outputs.app_version }}.exe
+            dist-electron/Personalize Chat Setup ${{ needs.check-changes.outputs.app_version }}.exe.blockmap
+            dist-electron/latest.yml
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-vps:
+    name: Publish Release to VPS Download Server
+    needs: [check-changes, build-windows]
+    if: needs.check-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-release-v${{ needs.check-changes.outputs.app_version }}
+          path: release-artifacts
+
+      - name: Verify downloaded artifacts
+        run: |
+          TARGET_VERSION="${{ needs.check-changes.outputs.app_version }}"
+          echo "Verifying downloaded artifacts for version $TARGET_VERSION..."
+          ls -la release-artifacts/
+          test -f "release-artifacts/Personalize Chat Setup ${TARGET_VERSION}.exe" || { echo "::error::Missing exe in release-artifacts"; exit 1; }
+          test -f "release-artifacts/Personalize Chat Setup ${TARGET_VERSION}.exe.blockmap" || { echo "::error::Missing blockmap in release-artifacts"; exit 1; }
+          test -f "release-artifacts/latest.yml" || { echo "::error::Missing latest.yml in release-artifacts"; exit 1; }
+          echo "All 3 release artifacts confirmed present."
+
       - name: Prepare VPS directories and archive prior release
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -277,7 +310,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
-          source: "dist-electron/Personalize Chat Setup ${{ needs.check-changes.outputs.app_version }}.exe,dist-electron/Personalize Chat Setup ${{ needs.check-changes.outputs.app_version }}.exe.blockmap,dist-electron/latest.yml"
+          source: "release-artifacts/*"
           target: "/opt/company/apps/personalize-chat/download/desktop/.staging"
           strip_components: 1
 
