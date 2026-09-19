@@ -8,6 +8,8 @@ on:
       - 'package.json'
       - 'electron/**'
       - 'client/**'
+      - '.github/workflows/desktop-release.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,6 +30,15 @@ jobs:
       - name: Detect version or code changes
         id: detect
         run: |
+          # If triggered manually via workflow_dispatch, always build current version
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_VERSION=$(node -p "require('./package.json').version || ''")
+            echo "Manual workflow dispatch trigger detected for version $APP_VERSION."
+            echo "app_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           BEFORE_SHA="${{ github.event.before }}"
           if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
             BEFORE_SHA="HEAD~1"
@@ -40,9 +51,22 @@ jobs:
           echo "Current package.json version: $CURRENT_VERSION"
           echo "app_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
-          # 2. Read previous app version from BEFORE_SHA:package.json
-          PREV_VERSION=$(git show "$BEFORE_SHA:package.json" 2>/dev/null | node -p "try { JSON.parse(fs.readFileSync(0, 'utf8')).version || '' } catch(e) { '' }" || echo "")
-          echo "Previous package.json version: $PREV_VERSION"
+          # 2. Query published production version from live VPS latest.yml
+          LIVE_VERSION=$(curl -sf -H "User-Agent: GitHub-Actions-CI" https://chat.cybersahayak.cloud/download/desktop/latest.yml 2>/dev/null | grep -E '^version:' | awk '{print $2}' | tr -d '\r\n' || echo "")
+          echo "Live published version on VPS: ${LIVE_VERSION:-<none>}"
+
+          # If live version exists on VPS, use it as baseline.
+          # If VPS is reachable but has no latest.yml yet, this is the initial release (baseline is empty).
+          # Otherwise (offline/unreachable), fall back to BEFORE_SHA:package.json.
+          if [ -n "$LIVE_VERSION" ]; then
+            PREV_VERSION="$LIVE_VERSION"
+          elif curl -sf -H "User-Agent: GitHub-Actions-CI" https://chat.cybersahayak.cloud/health >/dev/null 2>&1; then
+            echo "Verified live VPS is online; no desktop release published yet (initial release)."
+            PREV_VERSION=""
+          else
+            PREV_VERSION=$(git show "$BEFORE_SHA:package.json" 2>/dev/null | node -p "try { JSON.parse(fs.readFileSync(0, 'utf8')).version || '' } catch(e) { '' }" || echo "")
+          fi
+          echo "Baseline previous version: ${PREV_VERSION:-<none>}"
 
           # 3. Check if files in electron/ or client/ changed
           CHANGED_DESKTOP_FILES=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" -- electron/ client/ || true)
@@ -114,7 +138,7 @@ jobs:
 
           case "$EVAL_RESULT" in
             "RELEASE")
-              echo "Valid semver bump detected ($PREV_VERSION -> $CURRENT_VERSION). Proceeding with desktop release build."
+              echo "Valid semver bump detected (${PREV_VERSION:-<none>} -> $CURRENT_VERSION). Proceeding with desktop release build."
               echo "should_release=true" >> "$GITHUB_OUTPUT"
               exit 0
               ;;
